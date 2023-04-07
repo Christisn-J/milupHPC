@@ -68,6 +68,15 @@ public:
     integer *h_nnl; // max(number of interactions)
     /// host number of interactions
     integer *h_noi; // number of interactions (alternatively initialize nnl with -1, ...)
+
+#if PERIODIC_BOUNDARIES
+    /// host near(est) neighbor list
+    integer *h_nnlGhost; // max(number of interactions with ghost particles)
+    /// host number of interactions with ghost particles
+    integer *h_noiGhost;
+    /// host list to map particles to ghost particles
+    integer *h_mapGhost; // max(number particles times number of max possible ghost particles)
+#endif
     /// host internal energy
     real *h_e, *_h_e; // internal energy
     /// host time derivative of internal energy
@@ -232,6 +241,14 @@ public:
     /// device number of interaction
     integer *d_noi; // number of interactions (alternatively initialize nnl with -1, ...)
     /// device internal energy
+#if PERIODIC_BOUNDARIES
+    /// host near(est) neighbor list
+    integer *d_nnlGhost; // max(number of interactions with ghost particles)
+    /// host number of interactions with ghost particles
+    integer *d_noiGhost;
+    /// host list to map particles to ghost particles
+    integer *d_mapGhost; // max(number particles times number of max possible ghost particles)
+#endif
     real *d_e, *_d_e; // internal energy
     /// device time derivative of internal energy
     real *d_dedt, *_d_dedt;

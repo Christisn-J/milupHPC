@@ -117,6 +117,15 @@ public:
     /// (pointer to) number of interactions (array)
     integer *noi; // number of interactions (alternatively initialize nnl with -1, ...)
 
+#if PERIODIC_BOUNDARIES
+    /// (pointer to) near(est) neighbor list (array)
+    integer *nnlGhost; // max(number of interactions wiht ghosts)
+    /// (pointer to) number of interactions with ghost particles (array)
+    integer *noiGhost;
+    /// (pointer to) list to map particles to ghost particles (array)
+    integer *mapGhost; // max(number particles times number of max possible ghost particles)
+#endif
+
     /// (pointer to) internal energy (array)
     real *e; // internal energy
     /// (pointer to) time derivative of internal energy (array)
@@ -400,6 +409,17 @@ public:
      * @param muijmax
      */
     CUDA_CALLABLE_MEMBER void setArtificialViscosity(real *muijmax);
+
+#if PERIODIC_BOUNDARIES
+    /**
+     * @brief Setter for values of ghost particles.
+     *
+     * @param nnlGhost
+     * @param noiGhost
+     * @param mapGhost
+     */
+    CUDA_CALLABLE_MEMBER void setGhost(integer nnlGhost, integer noiGhost, integer mapGhost);
+#endif
 
 #if BALSARA_SWITCH
     CUDA_CALLABLE_MEMBER void setDivCurl(real *divv, real *curlv);
@@ -696,6 +716,13 @@ namespace ParticlesNS {
         namespace Launch {
             void setArtificialViscosity(Particles *particles, real *muijmax);
         }
+        
+#if PERIODIC_BOUNDARIES
+        __global__ void  setGhost(integer nnlGhost, integer noiGhost, integer mapGhost);
+        namespace Launch {
+            void  setGhost(integer nnlGhost, integer noiGhost, integer mapGhost);
+        }
+#endif
 
 #if BALSARA_SWITCH
         __global__ void setDivCurl(Particles *particles, real *divv, real *curlv);
