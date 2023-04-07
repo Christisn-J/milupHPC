@@ -44,6 +44,11 @@ ParticleHandler::ParticleHandler(integer numParticles, integer numNodes) : numPa
     h_sml = _h_sml;
     h_nnl = new integer[numParticles * MAX_NUM_INTERACTIONS];
     h_noi = new integer [numParticles];
+#if PERIODIC_BOUNDARIES
+    h_nnlGhost = new integer[numParticles * MAX_NUM_GHOST_INTERACTIONS];
+    h_noiGhost = new integer [numParticles];
+    h_mapGhost = new integer [numParticles*MAX_GHOSTS_PER_PARTICLE];
+#endif
     _h_e = new real[numParticles];
     h_e = _h_e;
     _h_dedt = new real[numParticles];
@@ -170,6 +175,11 @@ ParticleHandler::ParticleHandler(integer numParticles, integer numNodes) : numPa
     d_sml = _d_sml;
     cuda::malloc(d_nnl, numParticles * MAX_NUM_INTERACTIONS);
     cuda::malloc(d_noi, numParticles);
+#if PERIODIC_BOUNDARIES
+    cuda::malloc(d_nnlGhost, numParticles*MAX_NUM_GHOST_INTERACTIONS);
+    cuda::malloc(d_noiGhost, numParticles);
+    cuda::malloc(d_mapGhost, numParticles*MAX_GHOSTS_PER_PARTICLE);
+#endif
     cuda::malloc(_d_e, numParticles);
     d_e = _d_e;
     cuda::malloc(_d_dedt, numParticles);
@@ -276,6 +286,7 @@ ParticleHandler::ParticleHandler(integer numParticles, integer numNodes) : numPa
                                      d_nnl, d_noi, d_e, d_dedt, d_cs, d_rho, d_p);
 #endif
 
+
 #if DIM == 1
     h_particles->setGravity(h_g_ax);
     ParticlesNS::Kernel::Launch::setGravity(d_particles, d_g_ax);
@@ -300,6 +311,10 @@ ParticleHandler::ParticleHandler(integer numParticles, integer numNodes) : numPa
     h_particles->setIntegrateDensity(h_drhodt);
     ParticlesNS::Kernel::Launch::setIntegrateDensity(d_particles, d_drhodt);
 //#endif
+#if PERIODIC_BOUNDARIES
+    h_particles->setPeriodicVariables(h_nnlGhost, h_noiGhost, h_mapGhost);
+    ParticlesNS::Kernel::Launch::setPeriodicVariables(d_particles, d_nnlGhost, d_noiGhost, d_mapGhost);
+#endif
 #if VARIABLE_SML || INTEGRATE_SML
     h_particles->setVariableSML(h_dsmldt);
     ParticlesNS::Kernel::Launch::setVariableSML(d_particles, d_dsmldt);
@@ -388,6 +403,11 @@ ParticleHandler::~ParticleHandler() {
     delete [] _h_sml;
     delete [] h_nnl;
     delete [] h_noi;
+#if PERIODIC_BOUNDARIES
+    delete [] h_nnlGhost;
+    delete [] h_noiGhost;
+    delete [] h_mapGhost;
+#endif
     delete [] _h_e;
     delete [] _h_dedt;
     delete [] _h_cs;
@@ -424,6 +444,11 @@ ParticleHandler::~ParticleHandler() {
     cuda::free(_d_sml);
     cuda::free(d_nnl);
     cuda::free(d_noi);
+#if PERIODIC_BOUNDARIES
+    cuda::free(d_nnlGhost);
+    cuda::free(d_noiGhost);
+    cuda::free(d_mapGhost);
+#endif
     cuda::free(_d_e);
     cuda::free(_d_dedt);
     cuda::free(_d_cs);

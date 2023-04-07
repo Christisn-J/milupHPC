@@ -172,6 +172,14 @@ CUDA_CALLABLE_MEMBER void Particles::setU(real *u) {
     this->u = u;
 }
 
+#if PERIODIC_BOUNDARIES
+    CUDA_CALLABLE_MEMBER void Particles::setGhost(integer nnlGhost, integer noiGhost, integer mapGhost){
+        this->nnlGhost = nnlGhost;
+        this->noiGhost = noiGhost;
+        this->mapGhost = mapGhost;
+    }
+#endif
+
 CUDA_CALLABLE_MEMBER void Particles::setNodeType(integer *nodeType) {
     this->nodeType = nodeType;
 }
@@ -754,6 +762,19 @@ namespace ParticlesNS {
                              muijmax);
             }
         }
+
+#if PERIODIC_BOUNDARIES
+        __global__ void setGhost(Particles *particles, integer nnlGhost, integer noiGhost, integer mapGhost){
+            particles->setGhost(nnlGhost, noiGhost, mapGhost);
+        }
+
+        namespace Launch {
+            void setGhost(Particles *particles,  integer ghostNnl, integer ghostNoi, integer ghostMap) {
+                ExecutionPolicy executionPolicy(1, 1);
+                cuda::launch(false, executionPolicy, ::ParticlesNS::Kernel::setGhost, particles, nnlGhost, noiGhost, mapGhost);
+            }
+        }
+#endif
 
 #if BALSARA_SWITCH
         __global__ void setDivCurl(Particles *particles, real *divv, real *curlv) {
