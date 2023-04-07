@@ -1,6 +1,6 @@
 /**
  * @file updateGhostState.cuh
- * @brief .
+ * @brief update all ghost variables.
  *
  * @author Christian Jetter
  * @bug no known bugs
@@ -14,10 +14,27 @@
 namespace SPH {
 
     namespace Kernel {
-        __global__ void updateGhostState(Tree *tree, Particles *particles, integer *interactions,integer numParticlesLocal, integer numParticles, integer numNodes);
+        /**
+         * @brief  compare for each ghost particle all values ​​with original particle.
+         *
+         * > Corresponding wrapper function: ::SPH::Kernel::Launch::updateGhostState()
+         *
+         * Update all values ​​related to the origin particle.
+         *
+         * @param particles Particles class instance
+         * @param ghosts IntegratedParticleHandler class instance
+         */
+
+        __global__ void updateGhostState(Particles *particles, IntegratedParticleHandler *ghosts);
 
         namespace Launch {
-            real updateGhostState(Tree *tree, Particles *particles, integer *interactions,integer numParticlesLocal, integer numParticles, integer numNodes);
+            /**
+             * @brief Wrapper for ::SPH::Kernel::updateGhostState().
+             * 
+             * @param particles Particles class instance
+             * @param ghosts IntegratedParticleHandler class instance
+             */
+            real updateGhostState(Particles *particles, IntegratedParticleHandler *ghosts);
         }
     }
 }
