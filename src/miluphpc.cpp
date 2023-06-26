@@ -2325,6 +2325,40 @@ real Miluphpc::parallel_sph() {
 
     time = 0;
 
+#if PERIODIC_BOUNDARIES
+    // insert ghost particles
+    // TODO: check if it is neccessary to allocate for the whole particle amount
+    // TODO: crate own handler for ghost particles instead of abusing IntegratedParticles
+    Logger(DEBUG) << "Particles:" << numParticles;
+    IntegratedParticleHandler *ghostsParticleHandler = new IntegratedParticleHandler(MAX_GHOSTS_PER_PARTICLE*numParticles, numNodes);
+
+    Logger(DEBUG) << "Creating ghost particles ...";
+    Logger(DEBUG) << "  Possible Ghosts: " << ghostsParticleHandler->numParticles;
+
+    // reset number of ghosts
+    Logger(DEBUG) << "  Initulate require Ghosts ...";
+/// TODO: implement host instanze for ghostParticles
+    // ghostsParticleHandler->h_ghostParticles->h_numGhosts = 0;
+    ghostsParticleHandler->h_numGhosts = 0;
+    Logger(DEBUG) << "      > host: " << &ghostsParticleHandler->h_numGhosts;
+    ghostsParticleHandler->copyNumGhosts(To::device);
+    Logger(DEBUG) << "      > device: " << ghostsParticleHandler->d_numGhosts;
+
+/// TODO: add timingsarticleHandler->d_particles, ghostParticleHandler->d_integratedParticles);
+    Logger(DEBUG) << "  Create Ghosts... ";
+    /*
+    Logger(DEBUG) << "      > Parameter: ";
+    Logger(DEBUG) << "          > Sml: " << particleHandler->h_particles->sml[0];
+    Logger(DEBUG) << "          > Tree: " << treeHandler->d_tree;
+    Logger(DEBUG) << "          > Particles: " << particleHandler->d_particles;
+    Logger(DEBUG) << "          > Ghost Particles: " << ghostsParticleHandler->d_integratedParticles;
+    */
+    time = SPH::Kernel::Launch::createGhostsPeriodic(treeHandler->d_tree, particleHandler->d_particles, ghostsParticleHandler->d_integratedParticles, ghostsParticleHandler->d_numGhosts);
+    Logger(DEBUG) << "  ... done. "; 
+    ghostsParticleHandler->copyNumGhosts(To::host);
+    Logger(TRACE) << "Number of ghost particles: " << ghostsParticleHandler->h_numGhosts;
+#endif
+
     // original master version
     /*
     Logger(DEBUG) << "relevant indices counter: " << relevantIndicesCounter;
@@ -2747,6 +2781,17 @@ real Miluphpc::parallel_sph() {
         exit(1);
     }
 
+#if PERIODIC_BOUNDARIES 
+/// TODO: add time
+    // ATTENTION: brute-force method
+    Logger(DEBUG) << "fixedRadiusNN_bruteForce for Ghosts";
+    time = SPH::Kernel::Launch::fixedRadiusNNGhost_bruteForce(particleHandler->d_particles, ghostsParticleHandler->d_integratedParticles);
+    Logger(DEBUG) << "...done";
+
+    time = SPH::Kernel::Launch::updateGhosts(particleHandler->d_particles, ghostsParticleHandler->d_integratedParticles);
+#endif
+
+
     profiler.value2file(ProfilerIds::Time::SPH::fixedRadiusNN, time);
     totalTime += time;
     Logger(TIME) << "sph: fixedRadiusNN: " << time << " ms";
@@ -2765,6 +2810,14 @@ real Miluphpc::parallel_sph() {
     // -----------------------------------------------------------------------------------------------------------------
     Logger(TIME) << "sph: calculateDensity: " << time << " ms";
     profiler.value2file(ProfilerIds::Time::SPH::density, time);
+
+#if PERIODIC_BOUNDARIES
+/// TODO: add time
+    Logger(DEBUG) << "addDensity of Ghosts";
+    time = SPH::Kernel::Launch::addDensity_Ghost(kernelHandler.kernel, particleHandler->d_particles, ghostsParticleHandler->d_integratedParticles);
+
+    time = SPH::Kernel::Launch::updateGhosts(particleHandler->d_particles, ghostsParticleHandler->d_integratedParticles);
+#endif
 
     Logger(DEBUG) << "calculate sound speed";
     // -----------------------------------------------------------------------------------------------------------------
@@ -2832,6 +2885,13 @@ real Miluphpc::parallel_sph() {
                                         particleHandler->d_particles, particleHandler->d_nnl, numParticlesLocal);
     Logger(TIME) << "sph: internalForces: " << time << " ms";
     profiler.value2file(ProfilerIds::Time::SPH::internalForces, time);
+
+#if PERIODIC_BOUNDARIES
+/// TODO: add time
+time = SPH::Kernel::Launch::updateGhosts(particleHandler->d_particles, ghostsParticleHandler->d_integratedParticles);
+
+time = SPH::Kernel::Launch::addForces_Ghost(kernelHandler.kernel, particleHandler->d_particles, ghostsParticleHandler->d_integratedParticles);
+#endif
 
     time = SubDomainKeyTreeNS::Kernel::Launch::repairTree(subDomainKeyTreeHandler->d_subDomainKeyTree, treeHandler->d_tree,
                                                           particleHandler->d_particles, domainListHandler->d_domainList,

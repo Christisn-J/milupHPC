@@ -42,6 +42,11 @@
 #include "sph/internal_forces.cuh"
 #include "sph/soundspeed.cuh"
 #include "simulation_time_handler.h"
+#include "ghost/createGhostParticles.cuh"
+#include "ghost/findGhostNN.cuh"
+#include "ghost/updateGhostState.cuh"
+#include "ghost/addGhostDensity.cuh"
+#include "ghost/addGhostForces.cuh"
 
 #include "processing/kernels.cuh"
 
