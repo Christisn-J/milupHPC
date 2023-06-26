@@ -312,8 +312,8 @@ ParticleHandler::ParticleHandler(integer numParticles, integer numNodes) : numPa
     ParticlesNS::Kernel::Launch::setIntegrateDensity(d_particles, d_drhodt);
 //#endif
 #if PERIODIC_BOUNDARIES
-    h_particles->setPeriodicVariables(h_nnlGhost, h_noiGhost, h_mapGhost);
-    ParticlesNS::Kernel::Launch::setPeriodicVariables(d_particles, d_nnlGhost, d_noiGhost, d_mapGhost);
+    h_particles->setGhostVariables(h_nnlGhost, h_noiGhost, h_mapGhost);
+    ParticlesNS::Kernel::Launch::setGhostVariables(d_particles, d_nnlGhost, d_noiGhost, d_mapGhost);
 #endif
 #if VARIABLE_SML || INTEGRATE_SML
     h_particles->setVariableSML(h_dsmldt);
@@ -923,8 +923,23 @@ void ParticleHandler::copySPH(To::Target target) {
 
 IntegratedParticleHandler::IntegratedParticleHandler(integer numParticles, integer numNodes) :
                                                         numParticles(numParticles), numNodes(numNodes) {
+#if PERIODIC_BOUNDARIES
+    //h_massGhosts =  new real[numParticles];
+    //h_usedGhosts = new bool[numParticles];
+    
+    //d_possibleGhosts = new integer;
+    //d_numGhosts = new integer;
+    //d_usedGhosts = new bool[numParticles];
+#endif
 
     cuda::malloc(d_uid, numParticles);
+
+#if PERIODIC_BOUNDARIES
+    //cuda::malloc(d_possibleGhosts, 1);
+    cuda::malloc(d_numGhosts, 1);
+    cuda::malloc(d_massGhosts, numParticles);
+    cuda::malloc(d_usedGhosts, numParticles);
+#endif
 
     cuda::malloc(d_x, numNodes);
     cuda::malloc(d_vx, numParticles); // numNodes
@@ -979,11 +994,29 @@ IntegratedParticleHandler::IntegratedParticleHandler(integer numParticles, integ
     IntegratedParticlesNS::Kernel::Launch::setIntegrateSML(d_integratedParticles, d_dsmldt);
 #endif
 
+#if PERIODIC_BOUNDARIES
+    IntegratedParticlesNS::Kernel::Launch::setNumGhosts(d_integratedParticles, d_numGhosts);
+    IntegratedParticlesNS::Kernel::Launch::setMassGhosts(d_integratedParticles, d_massGhosts);
+    IntegratedParticlesNS::Kernel::Launch::setusedGhosts(d_integratedParticles, d_usedGhosts);
+    // IntegratedParticlesNS::Kernel::Launch::setPossibleGhosts(d_integratedParticles, d_possibleGhosts);
+#endif
+ 
 }
 
 IntegratedParticleHandler::~IntegratedParticleHandler() {
 
+#if PERIODIC_BOUNDARIES
+    //delete [] h_massGhosts;
+    //delete [] h_usedGhosts;
+#endif
+
     cuda::free(d_uid);
+
+#if PERIODIC_BOUNDARIES
+    cuda::free(d_massGhosts);
+    cuda::free(d_numGhosts);
+    cuda::free(d_usedGhosts);
+#endif
 
     cuda::free(d_x);
     cuda::free(d_vx);
@@ -1018,5 +1051,13 @@ IntegratedParticleHandler::~IntegratedParticleHandler() {
     cuda::free(d_integratedParticles);
 
 }
+
+
+#if PERIODIC_BOUNDARIES
+void IntegratedParticleHandler::copyNumGhosts(To::Target target){
+    int lenght = 1;
+    cuda::copy(&h_numGhosts, d_numGhosts, lenght, target);
+}
+#endif
 
 

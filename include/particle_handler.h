@@ -242,11 +242,11 @@ public:
     integer *d_noi; // number of interactions (alternatively initialize nnl with -1, ...)
     /// device internal energy
 #if PERIODIC_BOUNDARIES
-    /// host near(est) neighbor list
+    /// device near(est) neighbor list
     integer *d_nnlGhost; // max(number of interactions with ghost particles)
-    /// host number of interactions with ghost particles
+    /// device number of interactions with ghost particles
     integer *d_noiGhost;
-    /// host list to map particles to ghost particles
+    /// hosdevicet list to map particles to ghost particles
     integer *d_mapGhost; // max(number particles times number of max possible ghost particles)
 #endif
     real *d_e, *_d_e; // internal energy
@@ -483,9 +483,38 @@ public:
     real *d_drhodt;
 //#endif
 
+#if PERIODIC_BOUNDARIES
+    /// device number of all possible ghosts
+    //integer *d_possibleGhosts;
+
+    /// host ghosts mass array
+    //real *h_massGhosts;
+    /// device ghosts mass array
+    real *d_massGhosts;
+
+    /// host number of ghosts particles
+    integer h_numGhosts;
+    /// device number of ghosts particles
+    integer *d_numGhosts;
+
+    /// host ghosts mass array
+    //bool *h_usedGhosts;
+    /// device ghosts mass array
+    bool *d_usedGhosts;
+#endif
+
 #if VARIABLE_SML || INTEGRATE_SML
     real *d_dsmldt;
 #endif
+
+/*
+#if PERIODIC_BOUNDARIES
+    /// host instance of `IntegratedParticles` class
+    IntegratedParticles *h_ghostParticles;
+    /// device instance of `IntegratedParticles` class
+    IntegratedParticles *d_ghostParticles;
+#endif
+*/
 
     /// device instance of `IntegratedParticles` class
     IntegratedParticles *d_integratedParticles;
@@ -502,6 +531,15 @@ public:
      * Destructor
      */
     ~IntegratedParticleHandler();
+
+#if PERIODIC_BOUNDARIES
+    /**
+     * copy ghosts's number to target (host/device)
+     *
+     * @param target host/device
+     */
+    void copyNumGhosts(To::Target target);
+#endif
 
 };
 
