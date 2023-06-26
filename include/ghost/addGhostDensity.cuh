@@ -8,8 +8,11 @@
 #ifndef MILUPHPC_DENSITYGHOST_CUH
 #define MILUPHPC_DENSITYGHOST_CUH
 
+#include "../particle_handler.h"
 #include "../particles.cuh"
 #include "../sph/sph.cuh"
+#include "../sph/kernel.cuh"
+#include "../parameter.h"
 
 namespace SPH {
 
@@ -31,10 +34,10 @@ namespace SPH {
          * 
          * @param kernel SPH smoothing kernel
          * @param particles Particles class instance
-         * @param ghosts IntegratedParticleHandler class instance
+         * @param ghosts IntegratedParticles class instance
          */
 
-        __global__ void addGhostDensity(::SPH::SPH_kernel kernel, Particles *particles, IntegratedParticleHandler *ghosts);
+        __global__ void addDensity_Ghost(::SPH::SPH_kernel kernel, Particles *particles, IntegratedParticles *ghosts);
 
         namespace Launch {
             /**
@@ -42,9 +45,9 @@ namespace SPH {
              * 
              * @param kernel SPH smoothing kernel
              * @param particles Particles class instance
-             * @param ghosts IntegratedParticleHandler class instance
+             * @param ghosts IntegratedParticles class instance
              */
-            real addGhostDensity(::SPH::SPH_kernel kernel, Particles *particles, IntegratedParticleHandler *ghosts);
+            real addDensity_Ghost(::SPH::SPH_kernel kernel, Particles *particles, IntegratedParticles *ghosts);
         }
 
     }

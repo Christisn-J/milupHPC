@@ -10,6 +10,7 @@
 
 #include "../particles.cuh"
 #include "../sph/sph.cuh"
+#include "../parameter.h"
 
 namespace SPH {
 
@@ -22,19 +23,19 @@ namespace SPH {
          * Update all values ​​related to the origin particle.
          *
          * @param particles Particles class instance
-         * @param ghosts IntegratedParticleHandler class instance
+         * @param ghosts IntegratedParticles class instance
          */
 
-        __global__ void updateGhostState(Particles *particles, IntegratedParticleHandler *ghosts);
+        __global__ void updateGhosts(Particles *particles, IntegratedParticles *ghosts);
 
         namespace Launch {
             /**
              * @brief Wrapper for ::SPH::Kernel::updateGhostState().
              * 
              * @param particles Particles class instance
-             * @param ghosts IntegratedParticleHandler class instance
+             * @param ghosts IntegratedParticles class instance
              */
-            real updateGhostState(Particles *particles, IntegratedParticleHandler *ghosts);
+            real updateGhosts(Particles *particles, IntegratedParticles *ghosts);
         }
     }
 }

@@ -10,6 +10,7 @@
 
 #include "../particles.cuh"
 #include "../sph/sph.cuh"
+#include "../particle_handler.h"
 
 namespace SPH {
 
@@ -27,7 +28,7 @@ namespace SPH {
          * @param [out] noiGhost number of ghost interactions
          */
 
-        __global__ void fixedRadiusNNGhost_bruteForce(Particles *particles, Particles *ghosts);
+        __global__ void fixedRadiusNNGhost_bruteForce(Particles *particles, IntegratedParticles *ghosts);
 
         namespace Launch {
             /**
@@ -36,7 +37,7 @@ namespace SPH {
              * @param particles Particles class instance
              * @param ghosts IntegratedParticleHandler class instance
              */
-            real fixedRadiusNNGhost_bruteForce(Particles *particles, Particles *ghosts);
+            real fixedRadiusNNGhost_bruteForce(Particles *particles, IntegratedParticles *ghosts);
         }
     }
 }

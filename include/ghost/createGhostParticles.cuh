@@ -10,6 +10,8 @@
 
 #include "../particles.cuh"
 #include "../sph/sph.cuh"
+#include "../particle_handler.h"
+#include "../parameter.h"
 
 namespace SPH {
 
@@ -22,8 +24,6 @@ namespace SPH {
          * In this function it is checked whether a particle feels the conditions for a ghost particle. 
          * If so, up to \f$2*Dim-1$\f ghost particles are formed from each particle.
          * In the end, the total number of ghost particles is stored in the ghost class.
-         * 
-         * 
          * 
          *\f[
          * Conditions for a ghost particle is teh following:
@@ -40,7 +40,7 @@ namespace SPH {
          * @param [out] numGhosts total number of ghost particles
          */
 
-        __global__ void createGhostParticles(Tree *tree, Particles *particles, IntegratedParticleHandler *ghosts);
+        __global__ void createGhostsPeriodic(Tree *tree, Particles *particles, IntegratedParticles *ghosts, integer *iGhost);
 
         namespace Launch {
             /**
@@ -50,7 +50,7 @@ namespace SPH {
              * @param tree Tree class instance
              * @param ghosts IntegratedParticleHandler class instance
              */
-            Particles createGhostParticles(Tree *tree, Particles *particles, IntegratedParticleHandler *ghosts);
+            real createGhostsPeriodic(Tree *tree, Particles *particles, IntegratedParticles *ghosts, integer *iGhost);
         }
     }
 }

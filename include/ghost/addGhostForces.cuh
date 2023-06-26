@@ -10,6 +10,10 @@
 
 #include "../particles.cuh"
 #include "../sph/sph.cuh"
+#include "../sph/kernel.cuh"
+#include "../particle_handler.h"
+#include "../parameter.h"
+
 
 class densityGhost {
 
@@ -31,10 +35,10 @@ namespace SPH {
          *
          * @param kernel SPH smoothing kernel
          * @param particles Particles class instance
-         * @param ghosts IntegratedParticleHandler class instance
+         * @param ghosts IntegratedParticles class instance
          */
 
-        __global__ void addGhostForces(::SPH::SPH_kernel kernel, Particles *particles, IntegratedParticleHandler *ghosts);
+        __global__ void addForces_Ghost(::SPH::SPH_kernel kernel, Particles *particles, IntegratedParticles *ghosts);
 
         namespace Launch {
             /**
@@ -42,9 +46,9 @@ namespace SPH {
              * 
              * @param kernel SPH smoothing kernel
              * @param particles Particles class instance
-             * @param ghosts IntegratedParticleHandler class instance
+             * @param ghosts IntegratedParticles class instance
              */
-            real addGhostForces(::SPH::SPH_kernel kernel, Particles *particles, IntegratedParticleHandler *ghosts);
+            real addForces_Ghost(::SPH::SPH_kernel kernel, Particles *particles, IntegratedParticles *ghosts);
         }
 
     }
