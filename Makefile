@@ -97,6 +97,7 @@ cleaner: clean
 #link
 $(TARGET): $(OBJECTS) $(CUDA_OBJECTS)
 	@echo "Linking ..."
+	@mkdir -p $(TARGETDIR)
 	@$(NVCC) $(GPU_ARCH) $(LFLAGS) $(INC) -o $(TARGETDIR)/$(TARGET) $^ $(LIB) #$(GPU_ARCH)
 
 #compile
