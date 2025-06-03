@@ -4,6 +4,7 @@
 #include "../include/integrator/leapfrog.h"
 #include "../include/utils/config_parser.h"
 #include <boost/filesystem.hpp>
+#include <boost/algorithm/string.hpp>
 
 #include <fenv.h>
 #include <iostream>
@@ -147,12 +148,14 @@ int main(int argc, char** argv)
     //LOGCFG.level = static_cast<typeLog>(1); //TRACE; //DEBUG;
     LOGCFG.rank = rank;
     //LOGCFG.outputRank = 0;
-    //Logger(DEBUG) << "DEBUG output";
-    //Logger(WARN) << "WARN output";
-    //Logger(ERROR) << "ERROR output";
-    //Logger(INFO) << "INFO output";
-    //Logger(TRACE) << "TRACE output";
-    //Logger(TIME) << "TIME output";
+#if DEBUGGING != 0
+    Logger(DEBUG) << "DEBUG " << DEBUG;
+    Logger(INFO) << "INFO " << INFO;
+    Logger(TRACE) << "TRACE " << TRACE;
+    Logger(WARN) << "WARN " << WARN;
+    Logger(ERROR) << "ERROR " << ERROR;
+    Logger(TIME) << "TIME " << TIME;
+#endif // DEBUGGING
 
     Logger(DEBUG) << "rank: " << rank << " | number of processes: " << numProcesses;
     Logger(DEBUG) << "device: " << device << " | num devices: " << numDevices;
@@ -166,14 +169,39 @@ int main(int argc, char** argv)
     LOGCFG.write2LogFile = confP.getVal<bool>("log");
     LOGCFG.omitTime = confP.getVal<bool>("omitTime");
 
-    parameters.directory = confP.getVal<std::string>("directory");
-    if (boost::filesystem::create_directories(parameters.directory)) {
-        Logger(DEBUG) << "Created directory: " << parameters.directory;
-    }
-    parameters.logDirectory = parameters.directory + std::string{"log/"};
-    if (boost::filesystem::create_directories(parameters.logDirectory)) {
-        Logger(DEBUG) << "Created directory: " << parameters.logDirectory;
-    }
+	// Try to get the output directory from the config file
+	std::string configDirectory;
+	try {
+   		configDirectory = confP.getVal<std::string>("directory");
+	} catch (...) {
+		Logger(DEBUG) << 'Not specified in config';
+    	configDirectory = ""; // Not specified in config
+	}
+
+	// Trim whitespace from config value
+	std::string trimmed = boost::algorithm::trim_copy(configDirectory);
+
+	// Define a regex for placeholder-style values
+	std::regex placeholderPattern(R"(<\s*(todo|to be set|placeholder)[^>]*>?)", std::regex_constants::icase);
+
+	// If the directory is not specified in the config, generate it based on the input file name
+	if (trimmed.empty() || std::regex_search(trimmed, placeholderPattern)) {
+    	boost::filesystem::path inputPath(result["input-file"].as<std::string>());
+    	std::string baseName = inputPath.stem().string();  // e.g., "testcase" from "testcase.h5"
+    	parameters.directory = std::string{"./output/"} + baseName;
+    	Logger(INFO) << "No output directory specified. Using: " << parameters.directory;
+	} else {
+    	parameters.directory = trimmed;
+	}
+
+	// Create the main output directory if it doesn't exist
+	if (boost::filesystem::create_directories(parameters.directory)) {
+    	Logger(DEBUG) << "Created directory: " << parameters.directory;
+	}
+	parameters.logDirectory = parameters.directory + std::string{"/log/"};
+	if (boost::filesystem::create_directories(parameters.logDirectory)) {
+    	Logger(DEBUG) << "Created directory: " << parameters.logDirectory;
+	}
 
     std::stringstream logFileName;
     logFileName << parameters.logDirectory << "miluphpc.log";
