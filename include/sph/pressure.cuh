@@ -45,6 +45,17 @@ namespace EOS {
      */
     __device__ void murnaghan(Material *materials, Particles *particles, int index);
 
+	/**
+     * @brief Tillotson Equation of State for material modeling.
+     *
+     * Refer to ::EquationOfStates.
+     *
+     * @param materials Material class instance
+     * @param particles Particles class instance
+     * @param index Relevant particle index
+     */
+    __device__ void tillotson(Material *materials, Particles *particles, int index);
+
     /**
      * @brief Isothermal gas.
      *
