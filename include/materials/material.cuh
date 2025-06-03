@@ -112,6 +112,20 @@ struct EqOfSt {
     real shear_modulus;
     real young_modulus;
 
+    // Tillotson
+    real till_rho_0;
+    real till_A;
+    real till_B;
+    real till_E_0;
+    real till_E_iv;
+    real till_E_cv;
+    real till_a;
+    real till_b;
+    real till_alpha;
+    real till_beta;
+    real rho_limit;
+    real cs_limit;
+
     CUDA_CALLABLE_MEMBER EqOfSt();
     CUDA_CALLABLE_MEMBER EqOfSt(int type, real polytropic_K, real polytropic_gamma); // what about new members of struct EqOfSt?
 
@@ -159,6 +173,19 @@ public:
     CUDA_CALLABLE_MEMBER ~Material();
 
     CUDA_CALLABLE_MEMBER void info();
+
+    // Tillotson
+    real till_rho_0;
+    real till_A;
+    real till_B;
+    real till_E_0;
+    real till_E_iv;
+    real _E_cv;
+    real till_a;
+    real till_b;
+    real till_alpha;
+    real till_beta;
+    real rho_limit;
 
     /*real density_floor;
 
