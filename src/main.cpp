@@ -32,6 +32,82 @@ bool checkFile(const std::string file, bool terminate, const std::string message
     }
 }
 
+std::string getOutputDirectory(const std::string& configDir,
+                               const std::string& parserDir,
+                               const std::string& inputFile)
+{
+    // 1. Prefer parser value if valid
+    if (!parserDir.empty() && parserDir != "-") {
+        Logger(DEBUG) << "Using output directory from parser: " << parserDir;
+        return parserDir;
+    }
+
+    // 2. Trim config directory
+    std::string trimmed = boost::algorithm::trim_copy(configDir);
+
+    // 3. Detect placeholder-like config entries
+    std::regex placeholderPattern(R"(<\s*(todo|to be set|placeholder)[^>]*>?)", std::regex_constants::icase);
+    if (trimmed.empty() || std::regex_search(trimmed, placeholderPattern)) {
+        // 4. Generate fallback: "./output/<basename of input file>"
+        boost::filesystem::path inputPath(inputFile);
+        std::string baseName = inputPath.stem().string();
+        std::string fallback = "./output/" + baseName;
+        Logger(INFO) << "No valid output directory specified. Using fallback: " << fallback;
+        return fallback;
+    }
+
+    Logger(DEBUG) << "Using output directory from config: " << trimmed;
+    return trimmed;
+}
+
+bool checkOutputDirectory(const std::string& dir,
+                          bool terminate = false,
+                          const std::string& message = "")
+{
+    if (!dir.empty() && dir != "-") {
+        if (boost::filesystem::exists(dir)) {
+            if (!boost::filesystem::is_directory(dir)) {
+                Logger(ERROR) << "Path exists but is not a directory: " << dir;
+                if (terminate) {
+                    Logger(WARN) << message;
+                    MPI_Finalize();
+                    exit(0);
+                }
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // Invalid directory
+    if (terminate) {
+        Logger(WARN) << message;
+        Logger(ERROR) << "No valid output directory provided!";
+        MPI_Finalize();
+        exit(0);
+    }
+
+    return false;
+}
+
+void createOutputDirectory(const std::string& dir, std::string& logDirOut)
+{
+    if (!boost::filesystem::exists(dir)) {
+        if (boost::filesystem::create_directories(dir)) {
+            Logger(DEBUG) << "Created output directory: " << dir;
+        } else {
+            Logger(ERROR) << "Failed to create output directory: " << dir;
+            MPI_Finalize();
+            exit(0);
+        }
+    }
+
+    logDirOut = dir + std::string{"log/"};
+    if (boost::filesystem::create_directories(logDirOut)) {
+        Logger(DEBUG) << "Created log directory: " << logDirOut;
+    }
+}
+
 void SetDeviceBeforeInit()
 {
     char * localRankStr = NULL;
@@ -97,6 +173,7 @@ int main(int argc, char** argv)
             ("m,material-config", "material config file", cxxopts::value<std::string>()->default_value("config/material.cfg"))
             ("c,curve-type", "curve type (Lebesgue: 0/Hilbert: 1)", cxxopts::value<int>()->default_value("-1"))
             ("f,input-file", "File name", cxxopts::value<std::string>()->default_value("-"))
+			("o,output", "Output directory", cxxopts::value<std::string>()->default_value("-"))
             ("v,verbosity", "Verbosity level", cxxopts::value<int>()->default_value("0"))
             ("h,help", "Show this help");
 
@@ -148,14 +225,12 @@ int main(int argc, char** argv)
     //LOGCFG.level = static_cast<typeLog>(1); //TRACE; //DEBUG;
     LOGCFG.rank = rank;
     //LOGCFG.outputRank = 0;
-#if DEBUGGING != 0
-    Logger(DEBUG) << "DEBUG " << DEBUG;
-    Logger(INFO) << "INFO " << INFO;
-    Logger(TRACE) << "TRACE " << TRACE;
-    Logger(WARN) << "WARN " << WARN;
-    Logger(ERROR) << "ERROR " << ERROR;
-    Logger(TIME) << "TIME " << TIME;
-#endif // DEBUGGING
+    //Logger(DEBUG) << "DEBUG output";
+    //Logger(WARN) << "WARN output";
+    //Logger(ERROR) << "ERROR output";
+    //Logger(INFO) << "INFO output";
+    //Logger(TRACE) << "TRACE output";
+    //Logger(TIME) << "TIME output";
 
     Logger(DEBUG) << "rank: " << rank << " | number of processes: " << numProcesses;
     Logger(DEBUG) << "device: " << device << " | num devices: " << numDevices;
@@ -169,39 +244,23 @@ int main(int argc, char** argv)
     LOGCFG.write2LogFile = confP.getVal<bool>("log");
     LOGCFG.omitTime = confP.getVal<bool>("omitTime");
 
-	// Try to get the output directory from the config file
-	std::string configDirectory;
-	try {
-   		configDirectory = confP.getVal<std::string>("directory");
-	} catch (...) {
-		Logger(DEBUG) << 'Not specified in config';
-    	configDirectory = ""; // Not specified in config
-	}
+    std::string configDir = confP.getVal<std::string>("directory");
+	std::string parserDir = result["output"].as<std::string>();
+	std::string inputFile = result["input-file"].as<std::string>();
 
-	// Trim whitespace from config value
-	std::string trimmed = boost::algorithm::trim_copy(configDirectory);
+	// Step 1: Decide which directory to use
+	std::string finalOutputDir = getOutputDirectory(configDir, parserDir, inputFile);
 
-	// Define a regex for placeholder-style values
-	std::regex placeholderPattern(R"(<\s*(todo|to be set|placeholder)[^>]*>?)", std::regex_constants::icase);
+	// Step 2: Check if it's valid
+	checkOutputDirectory(finalOutputDir, true, "Output directory is invalid!");
 
-	// If the directory is not specified in the config, generate it based on the input file name
-	if (trimmed.empty() || std::regex_search(trimmed, placeholderPattern)) {
-    	boost::filesystem::path inputPath(result["input-file"].as<std::string>());
-    	std::string baseName = inputPath.stem().string();  // e.g., "testcase" from "testcase.h5"
-    	parameters.directory = std::string{"./output/"} + baseName;
-    	Logger(INFO) << "No output directory specified. Using: " << parameters.directory;
-	} else {
-    	parameters.directory = trimmed;
-	}
+	// Step 3: Create directory (and log subdirectory)
+	std::string finalLogDir;
+	createOutputDirectory(finalOutputDir, finalLogDir);
 
-	// Create the main output directory if it doesn't exist
-	if (boost::filesystem::create_directories(parameters.directory)) {
-    	Logger(DEBUG) << "Created directory: " << parameters.directory;
-	}
-	parameters.logDirectory = parameters.directory + std::string{"/log/"};
-	if (boost::filesystem::create_directories(parameters.logDirectory)) {
-    	Logger(DEBUG) << "Created directory: " << parameters.logDirectory;
-	}
+	// Step 4: Store in parameters
+	parameters.directory = finalOutputDir;
+	parameters.logDirectory = finalLogDir;
 
     std::stringstream logFileName;
     logFileName << parameters.logDirectory << "miluphpc.log";
