@@ -22,6 +22,9 @@ docs/*
 doc/html/*
 doc/latex/*
 
+.venv/
+include/parameter.h
+
 kepler/*
 plummer/*.h5
 plummer/pl_N*/*
