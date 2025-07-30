@@ -22,6 +22,9 @@ include/parameter.h
 **/images/
 testcases/*.h5
 
+# Ignore binaries and temporary executables
+attraction_*
+
 # Simulation and dataset files
 kepler/
 plummer/*.h5
@@ -56,12 +59,19 @@ doc/latex/*
 scripts/
 **/*.sh
 **/*.zsh
+**/*.pbs
+
 # ... except those inside the cluster
 !cluster/**/*.sh
-
 
 # Python cache and compiled files
 __pycache__/
 *.py[cod]
 *$py.class
 
+# Ignore core dumps
+core.*
+
+# Archivverzeichnisse (falls noch nicht drin)
+archiv*/
+**/archiv*/
