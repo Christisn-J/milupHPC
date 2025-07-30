@@ -56,8 +56,8 @@ doc/latex/*
 scripts/
 **/*.sh
 **/*.zsh
-# ... except those inside the cluster/ directory
-!cluster/*.sh
+# ... except those inside the cluster
+!cluster/**/*.sh
 
 
 # Python cache and compiled files
