@@ -59,9 +59,11 @@ scripts/
 # ... except those inside the cluster
 !cluster/**/*.sh
 
-
 # Python cache and compiled files
 __pycache__/
 *.py[cod]
 *$py.class
 
+# Ignore all directories used for archiving (no archives tracked)
+archiv*/
+**/archiv*/
