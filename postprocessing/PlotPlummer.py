@@ -12,6 +12,31 @@ import csv
 """
 Based on https://github.com/jammartin/ParaLoBstar/blob/main/tools/conservation/main.py
 """
+def plot_2d_projection(x, y, rho, axis_labels, title, filename, output_dir, cmap="viridis", dpi=150):
+    """
+    Erzeugt eine 2D-Scatter-Projektion mit Farbkodierung (z. B. nach Dichte).
+
+    Parameters:
+        x, y         : Koordinaten für Achsen
+        rho          : Farbwerte (z. B. Dichte)
+        axis_labels  : Tuple mit Achsenbeschriftungen (z. B. ("x", "y"))
+        title        : Plot-Titel
+        filename     : Name der Ausgabedatei (ohne Pfad)
+        output_dir   : Ordner, in dem gespeichert wird
+        cmap         : Colormap
+        dpi          : Auflösung
+    """
+    fig, ax = plt.subplots(figsize=(6, 6), dpi=dpi)
+    sc = ax.scatter(x, y, c=rho, cmap=cmap, s=1.0)
+    ax.set_title(title)
+    ax.set_xlabel(axis_labels[0])
+    ax.set_ylabel(axis_labels[1])
+    ax.set_aspect("equal", adjustable="box")
+    cbar = fig.colorbar(sc, ax=ax)
+    cbar.set_label("Density")
+    fig.tight_layout()
+    plt.savefig(os.path.join(output_dir, filename))
+    plt.close(fig)
 
 if __name__ == "__main__":
 
@@ -132,20 +157,13 @@ if __name__ == "__main__":
                 else:
                     rho = np.ones_like(x)
 
-                # # 2D Scatterplot (x vs y)
-                # fig, ax = plt.subplots(figsize=(8, 8), dpi=150)
-                # scatter = ax.scatter(x, y, c=rho, cmap="viridis", s=1.0)
-                # ax.set_title(f"{os.path.basename(h5file)} (2D spatial)")
-                # ax.set_xlabel("x")
-                # ax.set_ylabel("y")
-                # ax.set_aspect("equal", adjustable="box")
-                # cbar = fig.colorbar(scatter, ax=ax)
-                # cbar.set_label("Density" if "rho" in data else "Uniform weight")
-                # fig.tight_layout()
-                # plt.savefig(os.path.join(args.output, f"{os.path.splitext(os.path.basename(h5file))[0]}_spatial2D.png"))
-                # plt.close(fig)
+                # 2D Projections
+                basename = os.path.splitext(os.path.basename(h5file))[0]
+                plot_2d_projection(x, y, rho, ("x", "y"), f"{basename} (x-y projection)", f"{basename}_proj_xy.png", args.output)
+                plot_2d_projection(x, z, rho, ("x", "z"), f"{basename} (x-z projection)", f"{basename}_proj_xz.png", args.output)
+                plot_2d_projection(y, z, rho, ("y", "z"), f"{basename} (y-z projection)", f"{basename}_proj_yz.png", args.output)
 
-                # 3D Scatterplot (x, y, z)
+                # 3D Scatterplot
                 fig3d = plt.figure(figsize=(8, 8), dpi=150)
                 ax3d = fig3d.add_subplot(111, projection='3d')  # 3D automatisch aktiviert
                 sc3d = ax3d.scatter(x, y, z, c=rho, cmap="viridis", s=1)
@@ -155,7 +173,7 @@ if __name__ == "__main__":
                 ax3d.set_zlabel("z")
                 cbar3d = fig3d.colorbar(sc3d, ax=ax3d, shrink=0.6, label="Density" if "rho" in data else "Uniform weight")
                 fig3d.tight_layout()
-                plt.savefig(os.path.join(args.output, f"{os.path.splitext(os.path.basename(h5file))[0]}_spatial3D.png"))
+                plt.savefig(os.path.join(args.output, f"{basename}_spatial3D.png"))
                 plt.close(fig3d)
     else:
 

@@ -21,7 +21,8 @@ class SedovSolution(object):
     rho0 = A*r**(-w)
     R_s = ((e * t**2)/(alpha * A))**(1/(nu + 2 - w))
     """
-    def __init__(self, e, rho, gamma=4/3., nu=3, w=0., epsilon=1e-50):
+
+    def __init__(self, e, rho, gamma=4 / 3., nu=3, w=0., epsilon=1e-50):
 
         # w = 0 --> uniform background
 
@@ -33,33 +34,33 @@ class SedovSolution(object):
         self._gamma = gamma
 
         self._rho0 = rho
-        self._rho1 = ((gamma + 1.)/(gamma - 1.)) * rho
+        self._rho1 = ((gamma + 1.) / (gamma - 1.)) * rho
 
         self._nDim = nu
         self._w = w
 
         # Constants for the parametric equations:
-        self.w1 = (3*nu - 2 + gamma*(2-nu))/(gamma + 1.)
-        self.w2 = (2.*(gamma-1) + nu)/gamma
-        self.w3 = nu*(2.-gamma)
+        self.w1 = (3 * nu - 2 + gamma * (2 - nu)) / (gamma + 1.)
+        self.w2 = (2. * (gamma - 1) + nu) / gamma
+        self.w3 = nu * (2. - gamma)
 
-        self.b0 = 1./(nu*gamma - nu + 2)
-        self.b2 = (gamma-1.)/(gamma*(self.w2-w))
-        self.b3 = (nu-w)/(float(gamma)*(self.w2-w))
-        self.b5 = (2.*nu-w*(gamma+1))/(self.w3-w)
-        self.b6 = 2./(nu+2-w)
-        self.b1 = self.b2 + (gamma+1.)*self.b0 - self.b6
-        self.b4 = self.b1*(nu-w)*(nu+2.-w)/(self.w3-w)
-        self.b7 = w*self.b6
-        self.b8 = nu*self.b6
+        self.b0 = 1. / (nu * gamma - nu + 2)
+        self.b2 = (gamma - 1.) / (gamma * (self.w2 - w))
+        self.b3 = (nu - w) / (float(gamma) * (self.w2 - w))
+        self.b5 = (2. * nu - w * (gamma + 1)) / (self.w3 - w)
+        self.b6 = 2. / (nu + 2 - w)
+        self.b1 = self.b2 + (gamma + 1.) * self.b0 - self.b6
+        self.b4 = self.b1 * (nu - w) * (nu + 2. - w) / (self.w3 - w)
+        self.b7 = w * self.b6
+        self.b8 = nu * self.b6
 
-        self.c0 = 2*(nu-1)*np.pi + (nu-2)*(nu-3)  # simple interpolation of correct function (only for nu=1,2,3)
-        self.c5 = 2./(gamma - 1)
-        self.c6 = (gamma + 1)/2.
-        self.c1 = self.c5*gamma
-        self.c2 = self.c6/gamma
-        self.c3 = (nu*gamma - nu + 2.)/((self.w1-w)*self.c6)
-        self.c4 = (nu + 2. - w)*self.b0*self.c6
+        self.c0 = 2 * (nu - 1) * np.pi + (nu - 2) * (nu - 3)  # simple interpolation of correct function (only for nu=1,2,3)
+        self.c5 = 2. / (gamma - 1)
+        self.c6 = (gamma + 1) / 2.
+        self.c1 = self.c5 * gamma
+        self.c2 = self.c6 / gamma
+        self.c3 = (nu * gamma - nu + 2.) / ((self.w1 - w) * self.c6)
+        self.c4 = (nu + 2. - w) * self.b0 * self.c6
 
         # Characterize the solution
         f_min = self.c2 if self.w1 > w else self.c6
@@ -77,7 +78,7 @@ class SedovSolution(object):
 
         # If min(eta) != 0 then all values for eta < min(eta) = 0
         if eta[0] > 0:
-            e01 = [0., eta[0]*(1-1e-10)]
+            e01 = [0., eta[0] * (1 - 1e-10)]
             d01 = [0., 0]
             p01 = [0., 0]
             v01 = [0., 0]
@@ -88,29 +89,29 @@ class SedovSolution(object):
             v = np.concatenate([np.array(v01), v])
 
         # Set up our interpolation functions
-        self._d = interp1d(eta, d, bounds_error=False, fill_value=1./self._rho1)
+        self._d = interp1d(eta, d, bounds_error=False, fill_value=1. / self._rho1)
         self._p = interp1d(eta, p, bounds_error=False, fill_value=0.)
         self._v = interp1d(eta, v, bounds_error=False, fill_value=0.)
 
         # Finally Calculate the normalization of R_s:
-        integral = eta**(nu-1)*(d*v**2 + p)
+        integral = eta ** (nu - 1) * (d * v ** 2 + p)
         integral = 0.5 * (integral[1:] + integral[:-1])
         d_eta = (eta[1:] - eta[:-1])
 
         # calculate integral and multiply by factor
-        alpha = (integral*d_eta).sum() * (8*self.c0)/((gamma**2-1.)*(nu+2.-w)**2)
-        self._c = (1./alpha)**(1./(nu+2-w))
+        alpha = (integral * d_eta).sum() * (8 * self.c0) / ((gamma ** 2 - 1.) * (nu + 2. - w) ** 2)
+        self._c = (1. / alpha) ** (1. / (nu + 2 - w))
 
     def parametrized_eta(self, var):
-        return (var**-self.b6)*((self.c1*(var-self.c2))**self.b2)*((self.c3*(self.c4-var))**(-self.b1))
+        return (var ** -self.b6) * ((self.c1 * (var - self.c2)) ** self.b2) * ((self.c3 * (self.c4 - var)) ** (-self.b1))
 
     def parametrized_d(self, var):
-        return (var**-self.b7)*((self.c1*(var-self.c2))**(self.b3-self._w*self.b2)) * \
-               ((self.c3*(self.c4-var))**(self.b4+self._w*self.b1))*((self.c5*(self.c6-var))**-self.b5)
+        return (var ** -self.b7) * ((self.c1 * (var - self.c2)) ** (self.b3 - self._w * self.b2)) * \
+            ((self.c3 * (self.c4 - var)) ** (self.b4 + self._w * self.b1)) * ((self.c5 * (self.c6 - var)) ** -self.b5)
 
     def parametrized_p(self, var):
-        return (var**self.b8)*((self.c3*(self.c4-var))**(self.b4+(self._w-2)*self.b1)) * \
-               ((self.c5*(self.c6-var))**(1-self.b5))
+        return (var ** self.b8) * ((self.c3 * (self.c4 - var)) ** (self.b4 + (self._w - 2) * self.b1)) * \
+            ((self.c5 * (self.c6 - var)) ** (1 - self.b5))
 
     def parametrized_v(self, var):
         return self.parametrized_eta(var) * var
@@ -119,16 +120,16 @@ class SedovSolution(object):
     def shock_radius(self, t):
         # outer radius at time t
         t = np.maximum(t, self._epsilon)
-        return self._c * (self.e*t**2/self.rho0)**(1./(self._nDim + 2-self._w))
+        return self._c * (self.e * t ** 2 / self.rho0) ** (1. / (self._nDim + 2 - self._w))
 
     def shock_velocity(self, t):
         # velocity of the shock wave
         t = np.maximum(t, self._epsilon)
-        return (2./(self._nDim+2-self._w)) * self.shock_radius(t) / t
+        return (2. / (self._nDim + 2 - self._w)) * self.shock_radius(t) / t
 
     def post_shock_pressure(self, t):
         # post shock pressure
-        return (2./(self.gamma+1))*self.rho0*self.shock_velocity(t)**2
+        return (2. / (self.gamma + 1)) * self.rho0 * self.shock_velocity(t) ** 2
 
     @property
     def post_shock_density(self, t=0):
@@ -137,26 +138,26 @@ class SedovSolution(object):
 
     def rho(self, r, t):
         # density at radius r and time t
-        eta = r/self.shock_radius(t)
-        return self.post_shock_density*self._d(eta)
+        eta = r / self.shock_radius(t)
+        return self.post_shock_density * self._d(eta)
 
     def pressure(self, r, t):
         # pressure at radius r and time t
-        eta = r/self.shock_radius(t)
-        return self.post_shock_pressure(t)*self._p(eta)
+        eta = r / self.shock_radius(t)
+        return self.post_shock_pressure(t) * self._p(eta)
 
     def velocity(self, r, t):
         # velocity at radius r, and time t
-        eta = r/self.shock_radius(t)
-        return self._v(eta)*(2/(self.gamma+1))*self.shock_velocity(t)
+        eta = r / self.shock_radius(t)
+        return self._v(eta) * (2 / (self.gamma + 1)) * self.shock_velocity(t)
 
     def internal_energy(self, r, t):
         # internal energy at radius r and time t
-        return self.pressure(r, t)/(self.rho(r, t)*(self.gamma-1))
+        return self.pressure(r, t) / (self.rho(r, t) * (self.gamma - 1))
 
     def entropy(self, r, t):
         # entropy at radius, r, and time, t
-        return self.pressure(r, t)/self.rho(r, t)**self.gamma
+        return self.pressure(r, t) / self.rho(r, t) ** self.gamma
 
     # Other properties
     @property
@@ -179,11 +180,12 @@ class Sedov(object):
     """
     Analytical solution for the sedov blast wave problem
     """
+
     def __init__(self, time, r_max):
 
-        rho0 = 1.0  #1
-        e0 = 1.0 #1e5
-        gamma = 5/3. #1.666667 #1.333
+        rho0 = 1.0  # 1
+        e0 = 1.0  # 1e5
+        gamma = 5 / 3.  # 1.666667 #1.333
         w = 0  # Power law index
         n_dim = 3
 
@@ -208,7 +210,71 @@ class Sedov(object):
         elif x == 'internal_energy':
             return self.sol.internal_energy(self.r, self.t)
         else:
-            raise AttributeError("Sedov solution for variable %s not known"%x)
+            raise AttributeError("Sedov solution for variable %s not known" % x)
+
+
+def plot_2d_projection(x, y, rho, axis_labels, title, filename, output_dir, cmap="viridis", dpi=150):
+    """
+    Erzeugt eine 2D-Scatter-Projektion mit Farbkodierung (z. B. nach Dichte).
+    """
+    fig, ax = plt.subplots(figsize=(6, 6), dpi=dpi)
+    sc = ax.scatter(x, y, c=rho, cmap=cmap, s=1.0)
+    ax.set_title(title)
+    ax.set_xlabel(axis_labels[0])
+    ax.set_ylabel(axis_labels[1])
+    ax.set_aspect("equal", adjustable="box")
+
+    cbar = fig.colorbar(sc, ax=ax)
+    cbar.set_label("Density")
+    fig.tight_layout()
+    plt.savefig(os.path.join(output_dir, filename))
+    plt.close(fig)
+
+
+def plot_2d_slice(x, y, z, rho, plane="xy", eps=0.005, output_dir=".", filename="slice.png", title="", cmap="viridis", dpi=150):
+    """
+    Plot a 2D slice of the particle distribution near a selected plane by showing only particles close to that plane.
+
+    Parameters:
+        x, y, z       : Arrays of particle positions
+        rho           : Array of particle densities (or other scalar to color)
+        plane         : "xy", "xz", or "yz"
+        eps           : Slice thickness (half-width) around plane (e.g. |z|<eps for xy slice)
+        output_dir    : Directory to save plot
+        filename      : Output image filename
+        title         : Plot title
+        cmap          : Matplotlib colormap
+        dpi           : Plot resolution
+    """
+    if plane == "xy":
+        mask = np.abs(z) < eps
+        x_proj, y_proj = x[mask], y[mask]
+        c_proj = rho[mask]
+        xlabel, ylabel = "x", "y"
+    elif plane == "xz":
+        mask = np.abs(y) < eps
+        x_proj, y_proj = x[mask], z[mask]
+        c_proj = rho[mask]
+        xlabel, ylabel = "x", "z"
+    elif plane == "yz":
+        mask = np.abs(x) < eps
+        x_proj, y_proj = y[mask], z[mask]
+        c_proj = rho[mask]
+        xlabel, ylabel = "y", "z"
+    else:
+        raise ValueError("Invalid plane: choose 'xy', 'xz', or 'yz'")
+
+    fig, ax = plt.subplots(figsize=(6, 6), dpi=dpi)
+    sc = ax.scatter(x_proj, y_proj, c=c_proj, cmap=cmap, s=1.0)
+    ax.set_title(title)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_aspect("equal", adjustable="box")
+    cbar = fig.colorbar(sc, ax=ax)
+    cbar.set_label("Density (ρ)")
+    fig.tight_layout()
+    fig.savefig(os.path.join(output_dir, filename))
+    plt.close(fig)
 
 
 if __name__ == '__main__':
@@ -231,7 +297,7 @@ if __name__ == '__main__':
     write_to_csv = False
 
     parser = argparse.ArgumentParser(description="Plotting Sedov simulation data and analytical solution.")
-    parser.add_argument("--input", "-i",  metavar="str", type=str, help="input file", required=True)
+    parser.add_argument("--input", "-i", metavar="str", type=str, help="input file", required=True)
     parser.add_argument("--output", "-o", metavar="str", type=str, help="output directory", required=True)
     parser.add_argument('--analytical', "-a", action='store_true')
     parser.add_argument('--csv', "-c", action='store_true')
@@ -257,7 +323,7 @@ if __name__ == '__main__':
         x = coordinates[:, 0]
         y = coordinates[:, 1]
         z = coordinates[:, 2]
-        r = np.sqrt(x**2 + y**2 + z**2)
+        r = np.sqrt(x ** 2 + y ** 2 + z ** 2)
         energy = h5f['e']
         noi = h5f['noi']
         time = float(h5f['time'][0])
@@ -328,6 +394,57 @@ if __name__ == '__main__':
         ax1.set_xlim(0, r_max)
         ax1.set_ylim(0, 4.0)
     elif args.plot_type == 1:
+
+        basename = os.path.splitext(os.path.basename(filename))[0]
+
+        # 2D-Projektionen
+        plot_2d_projection(x, y, rho, ("x", "y"),
+                           f"{basename} (x-y projection)",
+                           f"{basename}_proj_xy.png",
+                           args.output)
+        plot_2d_projection(x, z, rho, ("x", "z"),
+                           f"{basename} (x-z projection)",
+                           f"{basename}_proj_xz.png",
+                           args.output)
+        plot_2d_projection(y, z, rho, ("y", "z"),
+                           f"{basename} (y-z projection)",
+                           f"{basename}_proj_yz.png",
+                           args.output)
+
+        slice_eps = 0.005  # tolerance for being in plane
+
+        # x, y, z, rho already loaded earlier
+        plot_2d_slice(x, y, z, rho, plane="xy", eps=slice_eps,
+                      output_dir=args.output,
+                      filename=f"{basename}_slice_xy.png",
+                      title=f"Slice in x-y (|z|<{slice_eps}), t={time:.2e}")
+
+        plot_2d_slice(x, y, z, rho, plane="xz", eps=slice_eps,
+                      output_dir=args.output,
+                      filename=f"{basename}_slice_xz.png",
+                      title=f"Slice in x-z (|y|<{slice_eps}), t={time:.2e}")
+
+        plot_2d_slice(x, y, z, rho, plane="yz", eps=slice_eps,
+                      output_dir=args.output,
+                      filename=f"{basename}_slice_yz.png",
+                      title=f"Slice in y-z (|x|<{slice_eps}), t={time:.2e}")
+
+        # 3D Scatter Plot of particle positions
+        fig = plt.figure(dpi=300, figsize=(10, 7))
+        ax = fig.add_subplot(projection='3d')
+
+        # Scatter plot using x, y, z positions colored by density (rho)
+        sc = ax.scatter(x, y, z, c=rho, cmap='viridis', s=1.0, alpha=0.5)
+        fig.colorbar(sc, ax=ax, pad=0.1, label='Density (ρ)')
+
+        ax.set_title(f"3D Particle Positions at t = {time:.2e}")
+        ax.set_xlabel("x")
+        ax.set_ylabel("y")
+        ax.set_zlabel("z")
+        ax.set_xlim([-r_max, r_max])
+        ax.set_ylim([-r_max, r_max])
+        ax.set_zlim([-r_max, r_max])
+    elif args.plot_type == 2:
         fig, (ax1, ax2, ax3) = plt.subplots(nrows=3, sharex=True)
         plt.subplots_adjust(hspace=0.1)
         if plot_analytical_solution:
@@ -349,7 +466,7 @@ if __name__ == '__main__':
         ax3.set_xlabel(r'$r$')
         ax3.set_ylabel(r'$e$')
         ax3.set_xlim(0, r_max)
-    elif args.plot_type == 2:
+    elif args.plot_type == 3:
         fig, (ax1, ax2, ax3, ax4) = plt.subplots(nrows=4, sharex=True)
         plt.subplots_adjust(hspace=0.1)
         if plot_analytical_solution:
