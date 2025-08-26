@@ -20,7 +20,8 @@ include/parameter.h
 # Test and temporary data
 **/testing/
 **/images/
-testcases/*.h5
+testcases/**/*.h5
+testcases/**/*.png
 
 # Ignore binaries and temporary executables
 attraction_*
