@@ -31,6 +31,7 @@ struct ArtificialViscosity {
 
     // enable communication via MPI (send instance of struct directly)
     friend class boost::serialization::access;
+
     /**
      * @brief Serialization function for boost::mpi functionality.
      *
@@ -50,15 +51,19 @@ struct ArtificialViscosity {
     real beta;
 
     CUDA_CALLABLE_MEMBER ArtificialViscosity();
+
     CUDA_CALLABLE_MEMBER ArtificialViscosity(real alpha, real beta);
 };
+
 #if ARTIFICIAL_STRESS
+
 /**
  * @brief Artificial stress parameters.
  */
 struct ArtificialStress {
 
     friend class boost::serialization::access;
+
     /**
      * @brief Serialization function for boost::mpi functionality.
      *
@@ -77,13 +82,16 @@ struct ArtificialStress {
     real epsilon_stress;
     real mean_particle_distance;
 };
+
 #endif
+
 /**
  * @brief Equation of states.
  */
 struct EqOfSt {
 
     friend class boost::serialization::access;
+
     /**
      * @brief Serialization function for boost::mpi functionality.
      *
@@ -101,6 +109,18 @@ struct EqOfSt {
         ar & n;
         ar & shear_modulus;
         ar & young_modulus;
+        // Tillotson
+        ar & till_A;
+        ar & till_B;
+        ar & E_0;
+        ar & E_iv;
+        ar & E_cv;
+        ar & till_a;
+        ar & till_b;
+        ar & till_alpha;
+        ar & till_beta;
+        ar & rho_limit;
+        ar & cs_limit;
     }
 
     int type;
@@ -113,12 +133,11 @@ struct EqOfSt {
     real young_modulus;
 
     // Tillotson
-    real till_rho_0;
     real till_A;
     real till_B;
-    real till_E_0;
-    real till_E_iv;
-    real till_E_cv;
+    real E_0;
+    real E_iv;
+    real E_cv;
     real till_a;
     real till_b;
     real till_alpha;
@@ -127,7 +146,9 @@ struct EqOfSt {
     real cs_limit;
 
     CUDA_CALLABLE_MEMBER EqOfSt();
-    CUDA_CALLABLE_MEMBER EqOfSt(int type, real polytropic_K, real polytropic_gamma); // what about new members of struct EqOfSt?
+
+    CUDA_CALLABLE_MEMBER EqOfSt(int type, real polytropic_K,
+                                real polytropic_gamma); // what about new members of struct EqOfSt?
 
 };
 
@@ -140,6 +161,7 @@ public:
 
     // enable communication via MPI (send instance of class directly)
     friend class boost::serialization::access;
+
     /**
      * @brief Serialization function for boost::mpi functionality.
      *
@@ -170,22 +192,10 @@ public:
     EqOfSt eos;
 
     CUDA_CALLABLE_MEMBER Material();
+
     CUDA_CALLABLE_MEMBER ~Material();
 
     CUDA_CALLABLE_MEMBER void info();
-
-    // Tillotson
-    real till_rho_0;
-    real till_A;
-    real till_B;
-    real till_E_0;
-    real till_E_iv;
-    real _E_cv;
-    real till_a;
-    real till_b;
-    real till_alpha;
-    real till_beta;
-    real rho_limit;
 
     /*real density_floor;
 
