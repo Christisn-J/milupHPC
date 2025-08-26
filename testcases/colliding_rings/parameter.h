@@ -18,6 +18,25 @@ typedef int integer;
 typedef unsigned long keyType;
 typedef int idInteger;
 
+constexpr integer INVALID_INTEGER = -1;
+constexpr real INVALID_REAL = -1.0;
+
+// Helper template to get invalid values based on type
+template<typename T>
+struct InvalidValue;
+
+template<>
+struct InvalidValue<integer> {
+    static constexpr integer
+    value = INVALID_INTEGER;
+};
+
+template<>
+struct InvalidValue<real> {
+    static constexpr real
+    value = INVALID_REAL;
+};
+
 #include <iostream>
 
 //#define theta 0.5
@@ -235,7 +254,7 @@ enum EquationOfStates {
     //EOS_TYPE_IGNORE = -1, /// particle is ignored
     EOS_TYPE_POLYTROPIC_GAS = 0, /// polytropic EOS for gas, needs polytropic_K and polytropic_gamma in material.cfg file
     EOS_TYPE_MURNAGHAN = 1, /// Murnaghan EOS for solid bodies, see Melosh "Impact Cratering", needs in material.cfg: rho_0, bulk_modulus, n
-    //EOS_TYPE_TILLOTSON = 2, /// Tillotson EOS for solid bodies, see Melosh "Impact Cratering", needs in material.cfg: till_rho_0, till_A, till_B, till_E_0, till_E_iv, till_E_cv, till_a, till_b, till_alpha, till_beta; bulk_modulus and shear_modulus are needed to calculate the sound speed and crack growth speed for FRAGMENTATION
+    EOS_TYPE_TILLOTSON = 2, /// Tillotson EOS for solid bodies, see Melosh "Impact Cratering", needs in material.cfg: till_rho_0, till_A, till_B, till_E_0, till_E_iv, till_E_cv, till_a, till_b, till_alpha, till_beta; bulk_modulus and shear_modulus are needed to calculate the sound speed and crack growth speed for FRAGMENTATION
     EOS_TYPE_ISOTHERMAL_GAS = 3, /// this is pure molecular hydrogen at 10 K
     //EOS_TYPE_REGOLITH = 4, /// The Bui et al. 2008 soil model
     //EOS_TYPE_JUTZI = 5, /// Tillotson EOS with p-alpha model by Jutzi et al.

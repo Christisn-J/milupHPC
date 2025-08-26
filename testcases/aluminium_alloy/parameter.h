@@ -10,13 +10,32 @@
  *     * maximal tree depth: (sizeof(keyType) - (sizeof(keyType) % DIM))/DIM
  */
 #ifdef SINGLE_PRECISION
-    typedef float real;
+typedef float real;
 #else
-    typedef double real;
+typedef double real;
 #endif
 typedef int integer;
 typedef unsigned long keyType;
 typedef int idInteger;
+
+constexpr integer INVALID_INTEGER = -1;
+constexpr real INVALID_REAL = -1.0;
+
+// Helper template to get invalid values based on type
+template<typename T>
+struct InvalidValue;
+
+template<>
+struct InvalidValue<integer> {
+    static constexpr integer
+    value = INVALID_INTEGER;
+};
+
+template<>
+struct InvalidValue<real> {
+    static constexpr real
+    value = INVALID_REAL;
+};
 
 #include <iostream>
 
@@ -24,7 +43,7 @@ typedef int idInteger;
 
 #define MAX_LEVEL 21
 
-#define DEBUGGING 0
+#define DEBUGGING 1
 
 /**
  * * `SAFETY_LEVEL 0`: almost no safety measures
@@ -117,11 +136,13 @@ typedef int idInteger;
 
 #define FORCES_FACT 0.2
 
-constexpr real dbl_max = std::numeric_limits<real>::max();
+constexpr real
+dbl_max = std::numeric_limits<real>::max();
 #define DBL_MAX dbl_max;
 
 namespace Constants {
-    constexpr real G = 6.67430e-11;
+    constexpr real
+    G = 6.67430e-11;
 }
 
 typedef struct SimulationParameters {
@@ -163,75 +184,79 @@ typedef struct SimulationParameters {
     int domainListSize;
 } SimulationParameters;
 
-struct To
-{
-    enum Target
-    {
+struct To {
+    enum Target {
         host, device
     };
     Target t_;
+
     To(Target t) : t_(t) {}
-    operator Target () const {return t_;}
+
+    operator Target() const { return t_; }
+
 private:
     template<typename T>
-    operator T () const;
+    operator T() const;
 };
 
-struct Smoothing
-{
-    enum Kernel
-    {
+struct Smoothing {
+    enum Kernel {
         spiky, cubic_spline, wendlandc2, wendlandc4, wendlandc6
     };
     Kernel t_;
+
     Smoothing(Kernel t) : t_(t) {}
-    operator Smoothing () const {return t_;}
+
+    operator Smoothing() const { return t_; }
+
 private:
     template<typename T>
-    operator T () const;
+    operator T() const;
 };
 
-struct Execution
-{
-    enum Location
-    {
+struct Execution {
+    enum Location {
         host, device
     };
     Location t_;
+
     Execution(Location t) : t_(t) {}
-    operator Location () const {return t_;}
+
+    operator Location() const { return t_; }
+
 private:
     template<typename T>
-    operator T () const;
+    operator T() const;
 };
 
-struct Curve
-{
-    enum Type
-    {
+struct Curve {
+    enum Type {
         lebesgue, hilbert
     };
     Type t_;
+
     Curve(Type t) : t_(t) {}
-    operator Type () const {return t_;}
+
+    operator Type() const { return t_; }
     //friend std::ostream& operator<<(std::ostream& out, const Curve::Type curveType);
 private:
     template<typename T>
-    operator T () const;
+    operator T() const;
 };
 
-struct IntegratorSelection
-{
-    enum Type
-    {
+struct IntegratorSelection {
+    enum Type {
         explicit_euler, predictor_corrector_euler, leapfrog
     };
     Type t_;
+
     IntegratorSelection(Type t) : t_(t) {}
-    operator Type () const {return t_;}
+
+    operator Type() const { return t_; }
+
 private:
     template<typename T>
-    operator T () const;
+    operator T() const;
 };
 
 /// implemented equation of states
@@ -254,10 +279,8 @@ enum EquationOfStates {
     //EOS_TYPE_JUTZI_ANEOS = 13/// ANEOS EOS with p-alpha model by Jutzi et al.
 };
 
-struct Entry
-{
-    enum Name
-    {
+struct Entry {
+    enum Name {
         x,
 #if DIM > 1
         y,
@@ -268,11 +291,14 @@ struct Entry
         mass
     };
     Name t_;
+
     Entry(Name t) : t_(t) {}
-    operator Name () const {return t_;}
+
+    operator Name() const { return t_; }
+
 private:
     template<typename T>
-    operator T () const;
+    operator T() const;
 };
 
 
