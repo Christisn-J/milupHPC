@@ -45,7 +45,7 @@ namespace EOS {
      */
     __device__ void murnaghan(Material *materials, Particles *particles, int index);
 
-	/**
+    /**
      * @brief Tillotson Equation of State for material modeling.
      *
      * Refer to ::EquationOfStates.
@@ -55,6 +55,7 @@ namespace EOS {
      * @param index Relevant particle index
      */
     __device__ void tillotson(Material *materials, Particles *particles, int index);
+//    __device__ void tillotson(Material *materials, Particles *particles, int index, double rho, double e, double &eta, double &mu, double &p1, double &p2);
 
     /**
      * @brief Isothermal gas.
@@ -106,8 +107,6 @@ namespace SPH {
     }
 
 }
-
-
 
 
 #endif //MILUPHPC_PRESSURE_CUH
