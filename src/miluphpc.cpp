@@ -186,8 +186,24 @@ void Miluphpc::distributionFromFile(const std::string& filename) {
     std::vector<integer> materialId;
 
     // read datasets from file
-    HighFive::DataSet mass = file.getDataSet("/m");
     HighFive::DataSet pos = file.getDataSet("/x");
+    // Check if dataset shape matches expected DIM
+    std::vector<size_t> pos_dims = pos.getSpace().getDimensions();
+
+    if (pos_dims.size() != 2) {
+        std::cerr << "Error: Dataset '/x' as not shape 2. Got " << pos_dims.size() << "D." << std::endl;
+        throw std::runtime_error("Invalid shape for dataset '/x'.");
+    }
+
+    if (pos_dims[1] != DIM) {
+        std::cerr << "Error: Position dataset '/x' has shape (" << pos_dims[0] << ", " << pos_dims[1]
+                  << "), but DIM is " << DIM << ". Aborting." << std::endl;
+        throw std::runtime_error("Mismatch between dataset '/x' dimensions and compile-time DIM set in parameter.h.");
+    }
+    // Log the dataset shape
+    Logger(DEBUG) << "Dataset '/x' has shape: (" << static_cast<int>(pos_dims[0]) << ", "<< static_cast<int>(pos_dims[1]) << ")";
+
+    HighFive::DataSet mass = file.getDataSet("/m");
     HighFive::DataSet vel = file.getDataSet("/v");
 
 #if SPH_SIM
@@ -726,6 +742,45 @@ real Miluphpc::reset() {
 #if SPH_SIM
     cuda::set(particleHandler->d_noi, 0, numParticles);
     cuda::set(particleHandler->d_nnl, -1, MAX_NUM_INTERACTIONS * numParticles);
+#endif
+
+#if SPH_SIM && DEBUGGING
+    Logger(DEBUG) << "initialization nnl";
+    particleHandler->copyNNL(To::host);
+
+    bool firstNonSelfLogged = false;
+
+    for (int i = 0; i < numParticlesLocal; ++i) {
+        int neighborCount = 0;
+        bool selfInNeighbors = false;
+
+        for (int j = 0; j < MAX_NUM_INTERACTIONS; ++j) {
+            int n = particleHandler->h_nnl[i * MAX_NUM_INTERACTIONS + j];
+            if (n == -1) break;
+            ++neighborCount;
+            if (n == i) selfInNeighbors = true;
+        }
+
+        if ((!selfInNeighbors && !firstNonSelfLogged)) {
+            Logger(DEBUG) << "Particle " << i << " has " << neighborCount << " neighbors and does not appear in its own neighbor list!";
+        }
+
+        // Nur beim ersten Partikel ohne Selbst-Nachbarschaft aktivieren
+        if (!selfInNeighbors && !firstNonSelfLogged) {
+            firstNonSelfLogged = true;
+        }
+
+        if (selfInNeighbors) {
+            std::stringstream ss;
+            ss << "Particle " << i << " has " << neighborCount << " neighbors and appear in its own neighbor list. Full neighbor list: \n";
+            for (int j = 0; j < MAX_NUM_INTERACTIONS; ++j) {
+                int n = particleHandler->h_nnl[i * MAX_NUM_INTERACTIONS + j];
+                if (n == -1) break;
+                ss << n << " ";
+            }
+            Logger(DEBUG) << ss.str();
+        }
+    }
 #endif
 
     //Logger(TIME) << "resetArrays: " << time << " ms";
@@ -2913,6 +2968,45 @@ real Miluphpc::parallel_sph() {
         exit(1);
     }
 
+#if SPH_SIM && DEBUGGING
+    Logger(DEBUG) << "fixedRadiusNN nnl";
+    particleHandler->copyNNL(To::host);
+
+    bool firstNonSelfLogged = false;
+
+    for (int i = 0; i < numParticlesLocal; ++i) {
+        int neighborCount = 0;
+        bool selfInNeighbors = false;
+
+        for (int j = 0; j < MAX_NUM_INTERACTIONS; ++j) {
+            int n = particleHandler->h_nnl[i * MAX_NUM_INTERACTIONS + j];
+            if (n == -1) break;
+            ++neighborCount;
+            if (n == i) selfInNeighbors = true;
+        }
+
+        if ((!selfInNeighbors && !firstNonSelfLogged)) {
+            Logger(DEBUG) << "Particle " << i << " has " << neighborCount << " neighbors and does not appear in its own neighbor list!";
+        }
+
+        // Nur beim ersten Partikel ohne Selbst-Nachbarschaft aktivieren
+        if (!selfInNeighbors && !firstNonSelfLogged) {
+            firstNonSelfLogged = true;
+        }
+
+        if (selfInNeighbors) {
+            std::stringstream ss;
+            ss << "Particle " << i << " has " << neighborCount << " neighbors and appear in its own neighbor list. Full neighbor list: \n";
+            for (int j = 0; j < MAX_NUM_INTERACTIONS; ++j) {
+                int n = particleHandler->h_nnl[i * MAX_NUM_INTERACTIONS + j];
+                if (n == -1) break;
+                ss << n << " ";
+            }
+            Logger(DEBUG) << ss.str();
+        }
+    }
+#endif
+
     profiler.value2file(ProfilerIds::Time::SPH::fixedRadiusNN, time);
     totalTime += time;
     Logger(TIME) << "sph: fixedRadiusNN: " << time << " ms";
@@ -2996,9 +3090,48 @@ real Miluphpc::parallel_sph() {
     totalTime += time;
 
     Logger(DEBUG) << "internal forces";
+#if SPH_SIM && DEBUGGING
+    Logger(DEBUG) << "internal forces nnl";
+    particleHandler->copyNNL(To::host);
+
+    firstNonSelfLogged = false;
+
+    for (int i = 0; i < numParticlesLocal; ++i) {
+        int neighborCount = 0;
+        bool selfInNeighbors = false;
+
+        for (int j = 0; j < MAX_NUM_INTERACTIONS; ++j) {
+            int n = particleHandler->h_nnl[i * MAX_NUM_INTERACTIONS + j];
+            if (n == -1) break;
+            ++neighborCount;
+            if (n == i) selfInNeighbors = true;
+        }
+
+        if ((!selfInNeighbors && !firstNonSelfLogged)) {
+            Logger(DEBUG) << "Particle " << i << " has " << neighborCount << " neighbors and does not appear in its own neighbor list!";
+        }
+
+        // Nur beim ersten Partikel ohne Selbst-Nachbarschaft aktivieren
+        if (!selfInNeighbors && !firstNonSelfLogged) {
+            firstNonSelfLogged = true;
+        }
+
+        if (selfInNeighbors) {
+            std::stringstream ss;
+            ss << "Particle " << i << " has " << neighborCount << " neighbors and appear in its own neighbor list. Full neighbor list: \n";
+            for (int j = 0; j < MAX_NUM_INTERACTIONS; ++j) {
+                int n = particleHandler->h_nnl[i * MAX_NUM_INTERACTIONS + j];
+                if (n == -1) break;
+                ss << n << " ";
+            }
+            Logger(DEBUG) << ss.str();
+        }
+    }
+#endif
 
     time = SPH::Kernel::Launch::internalForces(kernelHandler.kernel, materialHandler->d_materials, treeHandler->d_tree,
                                         particleHandler->d_particles, particleHandler->d_nnl, numParticlesLocal);
+    Logger(DEBUG) << "Test Miluphpc 00 achieved";
     Logger(TIME) << "sph: internalForces: " << time << " ms";
     profiler.value2file(ProfilerIds::Time::SPH::internalForces, time);
 
