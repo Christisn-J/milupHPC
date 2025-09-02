@@ -1073,6 +1073,12 @@ void ParticleHandler::copySPH(To::Target target) {
 #endif // SOLID
 }
 
+void ParticleHandler::copyNNL(To::Target target = To::host) {
+    int length = MAX_NUM_INTERACTIONS * numParticles;
+    cuda::copy(h_nnl, d_nnl, length, target);
+}
+
+
 IntegratedParticleHandler::IntegratedParticleHandler(integer numParticles, integer numNodes) :
                                                         numParticles(numParticles), numNodes(numNodes) {
 

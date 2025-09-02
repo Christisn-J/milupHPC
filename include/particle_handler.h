@@ -447,6 +447,7 @@ public:
                           bool includePseudoParticles = false);
 
     void copySPH(To::Target target);
+    void copyNNL(To::Target target);
 
 };
 
