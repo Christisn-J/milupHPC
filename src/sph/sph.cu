@@ -113,7 +113,7 @@ namespace SPH {
 
             register real d, r, interactionDistance;
 
-            register int noOfInteractions;
+            register int numberOfInteractions;
 
             register int currentNodeIndex[MAX_DEPTH];
             register int currentChildNumber[MAX_DEPTH];
@@ -144,7 +144,7 @@ namespace SPH {
                 depth = 0;
                 currentNodeIndex[depth] = 0; //numNodes - 1;
                 currentChildNumber[depth] = 0;
-                noOfInteractions = 0;
+                numberOfInteractions = 0;
 
                 r = radius * 0.5;
 
@@ -197,13 +197,23 @@ namespace SPH {
 
                                 if (d < (sml * sml) &&
                                     d < (smlj * smlj)
-                                    /*&& noOfInteractions < MAX_NUM_INTERACTIONS*/) { //TODO: remove, just for testing purposes
+                                    /*&& numberOfInteractions < MAX_NUM_INTERACTIONS*/) { //TODO: remove, just for testing purposes
+                                    if (index == childIndex) {
+                                        cudaTerminate("Invalid self-interaction: index = %i == childIndex = %i\n", index, childIndex);
+                                    }
+
+                                    if (numberOfInteractions >= MAX_NUM_INTERACTIONS) {
+                                        cudaTerminate("Too many interactions: index = %i, noi = %i >= MAX_NUM_INTERACTIONS = %i, sml = %e\n",
+                                                      index, numberOfInteractions, MAX_NUM_INTERACTIONS, sml);
+                                    }
+
+
                                     //printf("Adding interaction partner!\n");
-                                    interactions[index * MAX_NUM_INTERACTIONS + noOfInteractions] = childIndex;
+                                    interactions[index * MAX_NUM_INTERACTIONS + numberOfInteractions] = childIndex;
                                     // debug
-                                    //if (noOfInteractions > MAX_NUM_INTERACTIONS) {
-                                    //    printf("%i: noOfInteractions = %i > MAX_NUM_INTERACTIONS = %i (sml = %e) (%e, %e, %e)\n",
-                                    //           bodyIndex + offset, noOfInteractions, MAX_NUM_INTERACTIONS, particles->sml[bodyIndex + offset],
+                                    //if (numberOfInteractions > MAX_NUM_INTERACTIONS) {
+                                    //    printf("%i: numberOfInteractions = %i > MAX_NUM_INTERACTIONS = %i (sml = %e) (%e, %e, %e)\n",
+                                    //           bodyIndex + offset, numberOfInteractions, MAX_NUM_INTERACTIONS, particles->sml[bodyIndex + offset],
                                     //           particles->x[bodyIndex + offset], particles->y[bodyIndex + offset],
                                     //           particles->y[bodyIndex + offset]);
                                     //    assert(0);
@@ -216,7 +226,7 @@ namespace SPH {
                                     //    assert(0);
                                     //}
                                     // end: debug
-                                    noOfInteractions++;
+                                    numberOfInteractions++;
                                 }
                             }
 #if DIM == 1
@@ -272,8 +282,8 @@ namespace SPH {
 
                 } while (depth >= 0);
 
-                particles->noi[index] = noOfInteractions;
-                //printf("%i: noOfInteractions = %i\n", bodyIndex + offset, noOfInteractions);
+                particles->noi[index] = numberOfInteractions;
+                //printf("%i: numberOfInteractions = %i\n", bodyIndex + offset, numberOfInteractions);
 
                 offset += stride;
                 __syncthreads();
