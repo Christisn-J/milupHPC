@@ -225,6 +225,7 @@ __global__ void SPH::Kernel::internalForces(::SPH::SPH_kernel kernel, Material *
             j = interactions[i * MAX_NUM_INTERACTIONS + k];
 
             if (i == j) {
+//                printf("00 breakpoint detected\n");
                 cudaTerminate("i = %i == j = %i\n", i, j);
             }
 
@@ -334,6 +335,12 @@ __global__ void SPH::Kernel::internalForces(::SPH::SPH_kernel kernel, Material *
             // get sigma_j
             SPH::calcStress(particles, sigma_j, j);
 
+//#if PLASTICITY
+//            // plasticity scaling of sigma_i
+//            SPH::calcPlasticity(materials, matIdi, particles, sigma_i, i);
+//            // plasticity scaling of sigma_j
+//            SPH::calcPlasticity(materials, matIdj, particles, sigma_j, j);
+//#endif
             // calculate edot and rdot
             // edot_ab = 0.5 * (d_b v_a + d_a v_b)
             // rdot_ab = 0.5 * (d_b v_a - d_a v_b)
@@ -660,9 +667,8 @@ __global__ void SPH::Kernel::internalForces(::SPH::SPH_kernel kernel, Material *
         tensileMax = 0.0;
         tensileMax = CudaUtils::calculateMaxEigenvalue(sigma_i);
         particles->localStrain[i] = tensileMax/young;
-#endif // SOLID
-
-
+#endif // SOLI
+    printf("no breakpoint reached");
     } // particle loop end
 
 }

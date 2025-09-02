@@ -17,6 +17,7 @@
 #include "../cuda_utils/linalg.cuh"
 #include "../cuda_utils/cuda_utilities.cuh"
 #include "stress.cuh"
+//#include "plasticity.cuh"
 #include "artificial_stress.cuh"
 
 namespace SPH {
