@@ -134,9 +134,10 @@ def plot_2d_projection(x, y, rho, axis_labels, title, filename, output_dir, cmap
     ax.set_xlabel(axis_labels[0])
     ax.set_ylabel(axis_labels[1])
     ax.set_aspect("equal", adjustable="box")
+    # ax.ticklabel_format(style='sci', axis='both', scilimits=(0, 0))
 
     cbar = fig.colorbar(sc, ax=ax)
-    cbar.set_label("Density")
+    cbar.set_label("Density (ρ) in [kg/m³]")
     fig.tight_layout()
     plt.savefig(os.path.join(output_dir, filename))
     plt.close(fig)
@@ -161,16 +162,17 @@ def plot_2d_slice(x_proj, y_proj, rho_proj, axis_labels, title, filename, output
     ax.set_xlabel(axis_labels[0])
     ax.set_ylabel(axis_labels[1])
     ax.set_aspect("equal", adjustable="box")
+    # ax.ticklabel_format(style='sci', axis='both', scilimits=(0, 0))
 
     cbar = fig.colorbar(sc, ax=ax)
-    cbar.set_label("Density (ρ)")
+    cbar.set_label("Density (ρ) in [kg/m³]")
     fig.tight_layout()
     plt.savefig(os.path.join(output_dir, filename))
     plt.close(fig)
 
-def main(dim, verbose, outDir, delta, dry):
-    material = get_material_properties("AL6061")
-    logging.info(f"Gewähltes Material: {material['name']} mit Dichte {material["density"]} kg/m³")
+def main(dim, verbose, outDir, delta, dry, material_key):
+    material = get_material_properties(material_key)
+    logging.info(f"Gewähltes Material: {material['name']} mit Dichte {material['density']} kg/m³")
 
     impact_radius = IMPACT_RADIUS  # m
     impact_speed = IMPACT_SPEED  # m/s
@@ -228,17 +230,19 @@ def main(dim, verbose, outDir, delta, dry):
         ax.scatter(target_particles[:, 0], target_particles[:, 1], target_particles[:, 2], color='b', s=1, label='Al6061 Cube')
         ax.scatter(impactor_particles[:, 0], impactor_particles[:, 1], impactor_particles[:, 2], color='r', s=1, label='Impactor Sphere')
 
+        quiver_length_scale = 1.0  # 1 m/s = 1 m
+
         ax.quiver(target_particles[::skip_target, 0], target_particles[::skip_target, 1], target_particles[::skip_target, 2],
-                  target_particles[::skip_target, 3], target_particles[::skip_target, 4], target_particles[::skip_target, 5],
-                  color='c', length=1e-3, normalize=True)
+                  target_particles[::skip_target, 3]* quiver_length_scale, target_particles[::skip_target, 4]* quiver_length_scale, target_particles[::skip_target, 5]* quiver_length_scale,
+                  color='c', length=1e-3, normalize=False, width=3.0e-3)
 
         ax.quiver(impactor_particles[::skip_impact, 0], impactor_particles[::skip_impact, 1], impactor_particles[::skip_impact, 2],
-                  impactor_particles[::skip_impact, 3], impactor_particles[::skip_impact, 4], impactor_particles[::skip_impact, 5],
-                  color='orange', length=1e-2, normalize=True)
+                  impactor_particles[::skip_impact, 3]* quiver_length_scale, impactor_particles[::skip_impact, 4]* quiver_length_scale, impactor_particles[::skip_impact, 5]* quiver_length_scale,
+                  color='orange', length=1e-2, normalize=False, width=3.0e-3)
 
-        ax.set_xlabel('X-Axis')
-        ax.set_ylabel('Y-Axis')
-        ax.set_zlabel('Z-Axis')
+        ax.set_xlabel('x in [m]')
+        ax.set_ylabel('y in [m]')
+        ax.set_zlabel('z in [m]')
         ax.legend()
         ax.view_init(elev=0, azim=90)
 
@@ -249,14 +253,14 @@ def main(dim, verbose, outDir, delta, dry):
 
         ax.quiver(target_particles[::skip_target, 0], target_particles[::skip_target, 1],
                   target_particles[::skip_target, 3], target_particles[::skip_target, 4],
-                  color='b', scale=abs(impact_speed) * 2)
+                  color='b', scale=1.0, width=3.0e-3)
 
         ax.quiver(impactor_particles[::skip_impact, 0], impactor_particles[::skip_impact, 1],
                   impactor_particles[::skip_impact, 3], impactor_particles[::skip_impact, 4],
-                  color='orange', scale=abs(impact_speed) * 2)
+                  color='orange', scale=1.0, width=3.0e-3)
 
-        ax.set_xlabel('X-Axis')
-        ax.set_ylabel('Y-Axis')
+        ax.set_xlabel('x in [m]')
+        ax.set_ylabel('y in [m]')
         ax.legend()
 
     else:  # dim == 1
@@ -266,13 +270,13 @@ def main(dim, verbose, outDir, delta, dry):
 
         ax.quiver(target_particles[::skip_target, 0], np.zeros_like(target_particles[::skip_target, 0]),
                   target_particles[::skip_target, 3], np.zeros_like(target_particles[::skip_target, 0]),
-                  color='b', scale=abs(impact_speed) * 2)
+                  color='b', scale=1.0, linewidth=3.0e-3)
 
         ax.quiver(impactor_particles[::skip_impact, 0], np.zeros_like(impactor_particles[::skip_impact, 0]),
                   impactor_particles[::skip_impact, 3], np.zeros_like(impactor_particles[::skip_impact, 0]),
-                  color='orange', scale=abs(impact_speed) * 2)
+                  color='orange', scale=1.0, linewidth=3.0e-3)
 
-        ax.set_xlabel('X-Axis')
+        ax.set_xlabel('x in [m]')
         ax.set_yticks([])  # hide y-axis ticks in 1D
         ax.legend()
 
@@ -287,7 +291,8 @@ def main(dim, verbose, outDir, delta, dry):
     max_pos = np.max(total_particles[:, :dim], axis=0)
     logging.debug("Domain bounding box:")
     for i, axis in enumerate("xyz"[:dim]):
-        logging.debug(f"  {axis}-range: [{min_pos[i]:.4f}, {max_pos[i]:.4f}]")
+        length = max_pos[i] - min_pos[i]
+        logging.debug(f"  {axis}-range: [{min_pos[i]:.4f} m, {max_pos[i]:.4f} m] = {length:.4f} m")
     bbox_volume = np.prod(max_pos - min_pos)
     logging.debug(f"Bounding box volume: {bbox_volume:.4e} m³")
     logging.debug(f"Particle number density: {len(total_particles)/bbox_volume:.3e} particles/m³")
@@ -351,11 +356,11 @@ def main(dim, verbose, outDir, delta, dry):
         rho = total_particles[:, 8]
 
         # 2D Projektion ist einfach Scatterplot in XY
-        plot_2d_projection(x, y, rho,axis_labels=("x", "y"),title=f"(x-y projection)",filename=f"{basename}_proj_xy.png",output_dir=outDir)
+        plot_2d_projection(x, y, rho,axis_labels=("x in [m]", "y in [m]"),title=f"(x-y projection)",filename=f"{basename}_proj_xy.png",output_dir=outDir)
         # Slice ist in 2D redundant, aber für Konsistenz:
         # XY-Slice (z ≈ 0)
         mask_xy = np.abs(np.zeros_like(x)) < slice_eps
-        plot_2d_slice(x[mask_xy],y[mask_xy],rho[mask_xy],("x", "y"),f"Slice in x-y (|z|<{slice_eps})",f"{basename}_slice_xy.png",outDir)
+        plot_2d_slice(x[mask_xy],y[mask_xy],rho[mask_xy],("x in [m]", "y in [m]"),f"Slice in x-y (|z|<{slice_eps} m)",f"{basename}_slice_xy.png",outDir)
 
     elif dim == 3 and not dry:
         x = total_particles[:, 0]
@@ -363,34 +368,37 @@ def main(dim, verbose, outDir, delta, dry):
         z = total_particles[:, 2]
         rho = total_particles[:, 8]
 
-        plot_2d_projection(x, y, rho, ("x", "y"),f"(x-y projection)",f"{basename}_proj_xy.png",outDir)
-        plot_2d_projection(x, z, rho, ("x", "z"),f"(x-z projection)",f"{basename}_proj_xz.png",outDir)
-        plot_2d_projection(y, z, rho, ("y", "z"),f"(y-z projection)",f"{basename}_proj_yz.png",outDir)
+        plot_2d_projection(x, y, rho, ("x in [m]", "y in [m]"),f"(x-y projection)",f"{basename}_proj_xy.png",outDir)
+        plot_2d_projection(x, z, rho, ("x in [m]", "z in [m]"),f"(x-z projection)",f"{basename}_proj_xz.png",outDir)
+        plot_2d_projection(y, z, rho, ("y in [m]", "z in [m]"),f"(y-z projection)",f"{basename}_proj_yz.png",outDir)
 
         # XY-Slice (z ≈ 0)
         mask_xy = np.abs(z) < slice_eps
-        plot_2d_slice(x[mask_xy],y[mask_xy],rho[mask_xy],("x", "y"),f"Slice in x-y (|z|<{slice_eps})",f"{basename}_slice_xy.png",outDir)
+        plot_2d_slice(x[mask_xy],y[mask_xy],rho[mask_xy],("x in [m]", "y  in [m]"),f"Slice in x-y (|z|<{slice_eps} m)",f"{basename}_slice_xy.png",outDir)
 
         # XZ-Slice (y ≈ 0)
         mask_xz = np.abs(y) < slice_eps
-        plot_2d_slice(x[mask_xz],z[mask_xz],rho[mask_xz],("x", "z"),f"Slice in x-z (|y|<{slice_eps})",f"{basename}_slice_xz.png",outDir)
+        plot_2d_slice(x[mask_xz],z[mask_xz],rho[mask_xz],("x  in [m]", "z  in [m]"),f"Slice in x-z (|y|<{slice_eps} m)",f"{basename}_slice_xz.png",outDir)
 
         # YZ-Slice (x ≈ 0)
         mask_yz = np.abs(x) < slice_eps
-        plot_2d_slice(y[mask_yz],z[mask_yz],rho[mask_yz],("y", "z"),f"Slice in y-z (|x|<{slice_eps})",f"{basename}_slice_yz.png",outDir)
+        plot_2d_slice(y[mask_yz],z[mask_yz],rho[mask_yz],("y  in [m]", "z  in [m]"),f"Slice in y-z (|x|<{slice_eps} m)",f"{basename}_slice_yz.png",outDir)
 
     if not dry:
-        # Save data to HDF5
-        with h5py.File(os.path.join(outDir,f"{basename}.h5"), "w") as h5f:
-            h5f.create_dataset("x", data=total_particles[:, :dim])  # only spatial coordinates
-            h5f.create_dataset("v", data=total_particles[:, 3:3+dim])  # velocity components
-            h5f.create_dataset("m", data=total_particles[:, 6])  # mass
-            h5f.create_dataset("materialId", data=total_particles[:, 7].astype(np.int32))  # material id (float64 to int32)
-            h5f.create_dataset("rho", data=total_particles[:, 8])  # density
-
         logging.info("Saving files as:")
-        logging.info(f"  HDF5: {basename}.h5")
         logging.info(f"  Plots: {basename}_*.png")
+        try:
+            with h5py.File(os.path.join(outDir, f"{basename}.h5"), "w") as h5f:
+                h5f.create_dataset("x", data=total_particles[:, :dim]) # only spatial coordinates
+                h5f.create_dataset("v", data=total_particles[:, 3:3+dim]) # velocity components
+                h5f.create_dataset("m", data=total_particles[:, 6])  # mass
+                h5f.create_dataset("materialId", data=total_particles[:, 7].astype(np.int32)) # material id (float64 to int32)
+                h5f.create_dataset("rho", data=total_particles[:, 8]) # density
+
+            logging.info(f"  HDF5: {basename}.h5")
+
+        except Exception as e:
+            logging.error(f"Fehler beim Schreiben der HDF5-Datei: {e}")
 
         # === SPH Smoothing Length Vorschlag ===
         eta = 1.3  # Sicherheitsfaktor eta ∈ [1.2, 2.0]
@@ -401,6 +409,7 @@ def main(dim, verbose, outDir, delta, dry):
             logging.warning("Vorgeschlagene smoothing length ist kleiner als delta! SPH-Ergebnisse können ungenau sein.")
         elif smoothing_length < 1.1 * delta:
             logging.warning("Smoothing length ist nur minimal größer als delta – eventuell zu wenig Nachbarn.")
+
 
 
         if verbose:
@@ -436,6 +445,8 @@ if __name__ == '__main__':
                         help="Enable verbose output")
     parser.add_argument("--output", "-o", type=str, default="./", help="Output directory")
     parser.add_argument("--delta", type=float, default=1e-3, help="Particle spacing (default: 1e-3m)")
+    parser.add_argument("--material", type=str, default="AL6061", choices=MATERIALS.keys(),
+                        help="Material key to use (default: AL6061)")
     parser.add_argument("--dry", action="store_true", help="Run the script without saving any files.")
     args = parser.parse_args()
 
@@ -455,5 +466,6 @@ if __name__ == '__main__':
         logging.info("[Dry-run] Skipping file writes.")
 
 
-    main(args.dimensions, args.verbose, args.output, args.delta, args.dry)
+    main(args.dimensions, args.verbose, args.output, args.delta, args.dry, args.material)
+
 
