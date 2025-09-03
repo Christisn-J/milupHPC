@@ -3,6 +3,7 @@
 
 # IDE files
 **/.idea/
+**/.DS_Store
 
 # Build and output directories
 **/build/
@@ -20,7 +21,8 @@ include/parameter.h
 # Test and temporary data
 **/testing/
 **/images/
-testcases/*.h5
+testcases/**/*.h5
+testcases/**/*.png
 
 # Ignore binaries and temporary executables
 attraction_*
@@ -75,3 +77,6 @@ core.*
 # Archivverzeichnisse (falls noch nicht drin)
 archiv*/
 **/archiv*/
+
+
+
