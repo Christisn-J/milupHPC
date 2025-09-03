@@ -61,10 +61,10 @@ typedef int idInteger;
 #define INTEGRATE_ENERGY 1
 
 /// integrate density equation
-#define INTEGRATE_DENSITY 0
+#define INTEGRATE_DENSITY 1
 
 /// integrate smoothing length
-#define INTEGRATE_SML 1
+#define INTEGRATE_SML 0
 
 /// decouple smoothing length for pc integrator(s)
 #define DECOUPLE_SML 1
@@ -108,7 +108,11 @@ typedef int idInteger;
 #define KEY_MAX ULONG_MAX
 #define DOMAIN_LIST_SIZE 512
 #define MAX_DEPTH 128
-#define MAX_NUM_INTERACTIONS 180
+#define MAX_NUM_INTERACTIONS 10000 //180
+//#if PERIODIC_BOUNDARIES
+#define MAX_NUM_GHOST_INTERACTIONS MAX_NUM_INTERACTIONS
+#define MAX_GHOSTS_PER_PARTICLE int(2*DIM-1)
+//#endif
 #define NUM_THREADS_LIMIT_TIME_STEP 256
 #define NUM_THREADS_CALC_CENTER_OF_MASS 256
 

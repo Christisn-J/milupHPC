@@ -117,6 +117,15 @@ public:
     /// (pointer to) number of interactions (array)
     integer *noi; // number of interactions (alternatively initialize nnl with -1, ...)
 
+#if PERIODIC_BOUNDARIES
+    /// (pointer to) near(est) neighbor list (array)
+    integer *nnlGhost; // max(number of interactions wiht ghosts)
+    /// (pointer to) number of interactions with ghost particles (array)
+    integer *noiGhost;
+    /// (pointer to) list to map particles to ghost particles (array)
+    integer *mapGhost; // max(number particles times number of max possible ghost particles)
+#endif
+
     /// (pointer to) internal energy (array)
     real *e; // internal energy
     /// (pointer to) time derivative of internal energy (array)
@@ -400,6 +409,17 @@ public:
      * @param muijmax
      */
     CUDA_CALLABLE_MEMBER void setArtificialViscosity(real *muijmax);
+
+#if PERIODIC_BOUNDARIES
+    /**
+     * @brief Setter for values of ghost particles.
+     *
+     * @param nnlGhost
+     * @param noiGhost
+     * @param mapGhost
+     */
+    CUDA_CALLABLE_MEMBER void setGhostVariables(integer *nnlGhost, integer *noiGhost, integer *mapGhost);
+#endif
 
 #if BALSARA_SWITCH
     CUDA_CALLABLE_MEMBER void setDivCurl(real *divv, real *curlv);
@@ -696,6 +716,13 @@ namespace ParticlesNS {
         namespace Launch {
             void setArtificialViscosity(Particles *particles, real *muijmax);
         }
+        
+#if PERIODIC_BOUNDARIES
+        __global__ void  setGhostVariables(Particles *particles, integer *nnlGhost, integer *noiGhost, integer *mapGhost);
+        namespace Launch {
+            void  setGhostVariables(Particles *particles, integer *nnlGhost, integer *noiGhost, integer *mapGhost);
+        }
+#endif
 
 #if BALSARA_SWITCH
         __global__ void setDivCurl(Particles *particles, real *divv, real *curlv);
@@ -982,6 +1009,13 @@ public:
 
     /// unique identifier
     idInteger *uid;
+    
+#if PERIODIC_BOUNDARIES
+    // integer *possibleGhosts;
+    integer *numGhosts;
+    real *massGhosts;
+    bool *usedGhosts; 
+#endif
 
     ///
     real *x;
@@ -1066,6 +1100,12 @@ public:
     CUDA_CALLABLE_MEMBER void setIntegrateSML(real *dsmldt);
 #endif
 
+#if PERIODIC_BOUNDARIES
+    CUDA_CALLABLE_MEMBER void setMassGhosts(real *massGhosts);
+    CUDA_CALLABLE_MEMBER void setNumGhosts(integer *numGhosts);
+    CUDA_CALLABLE_MEMBER void setusedGhosts(bool *setusedGhosts);
+    // CUDA_CALLABLE_MEMBER void setPossibleGhosts(integer *possibleGhosts);
+#endif
     /**
      * Reset (specific) entries
      *
@@ -1153,6 +1193,38 @@ namespace IntegratedParticlesNS {
 
         namespace Launch {
             void setIntegrateSML(IntegratedParticles *integratedParticles, real *dsmldt);
+        }
+#endif
+
+#if PERIODIC_BOUNDARIES
+
+        __global__ void setusedGhosts(IntegratedParticles *integratedParticles, bool *usedGhosts);
+
+        namespace Launch {
+
+            void setusedGhosts(IntegratedParticles *integratedParticles, bool *usedGhosts);
+        }
+/*
+        __global__ void setPossibleGhosts(IntegratedParticles *integratedParticles, integer *possibleGhosts);
+
+        namespace Launch {
+
+            void setPossibleGhosts(IntegratedParticles *integratedParticles, integer *possibleGhosts);
+        }
+*/
+
+        __global__ void setMassGhosts(IntegratedParticles *integratedParticles, real *massGhosts);
+
+        namespace Launch {
+
+            void setMassGhosts(IntegratedParticles *integratedParticles, real *massGhosts);
+        }
+
+        __global__ void setNumGhosts(IntegratedParticles *integratedParticles, integer *numGhosts);
+
+        namespace Launch {
+
+            void setNumGhosts(IntegratedParticles *integratedParticles, integer *numGhosts);
         }
 #endif
 

@@ -172,6 +172,14 @@ CUDA_CALLABLE_MEMBER void Particles::setU(real *u) {
     this->u = u;
 }
 
+#if PERIODIC_BOUNDARIES
+    CUDA_CALLABLE_MEMBER void Particles::setGhostVariables(integer *nnlGhost, integer *noiGhost, integer *mapGhost){
+        this->nnlGhost = nnlGhost;
+        this->noiGhost = noiGhost;
+        this->mapGhost = mapGhost;
+    }
+#endif
+
 CUDA_CALLABLE_MEMBER void Particles::setNodeType(integer *nodeType) {
     this->nodeType = nodeType;
 }
@@ -755,6 +763,19 @@ namespace ParticlesNS {
             }
         }
 
+#if PERIODIC_BOUNDARIES
+        __global__ void setGhostVariables(Particles *particles, integer *nnlGhost, integer *noiGhost, integer *mapGhost){
+            particles->setGhostVariables(nnlGhost, noiGhost, mapGhost);
+        }
+
+        namespace Launch {
+            void setGhostVariables(Particles *particles,  integer *nnlGhost, integer *noiGhost, integer *mapGhost) {
+                ExecutionPolicy executionPolicy(1, 1);
+                cuda::launch(false, executionPolicy, ::ParticlesNS::Kernel::setGhostVariables, particles, nnlGhost, noiGhost, mapGhost);
+            }
+        }
+#endif
+
 #if BALSARA_SWITCH
         __global__ void setDivCurl(Particles *particles, real *divv, real *curlv) {
             particles->setDivCurl(divv, curlv);
@@ -1046,6 +1067,27 @@ CUDA_CALLABLE_MEMBER void IntegratedParticles::setIntegrateSML(real *dsmldt) {
 }
 #endif
 
+#if PERIODIC_BOUNDARIES
+
+CUDA_CALLABLE_MEMBER void IntegratedParticles::setusedGhosts(bool *usedGhosts) {
+    this->usedGhosts = usedGhosts;
+}
+
+/*
+CUDA_CALLABLE_MEMBER void IntegratedParticles::setPossibleGhosts(integer *possibleGhosts) {
+    this->possibleGhosts = possibleGhosts;
+}
+*/
+
+CUDA_CALLABLE_MEMBER void IntegratedParticles::setMassGhosts(real *massGhosts) {
+    this->massGhosts = massGhosts;
+}
+
+CUDA_CALLABLE_MEMBER void IntegratedParticles::setNumGhosts(integer *numGhosts){
+    this->numGhosts = numGhosts;
+}
+#endif
+
 CUDA_CALLABLE_MEMBER void IntegratedParticles::reset(integer index) {
 
     //TODO: what to reset?
@@ -1192,5 +1234,53 @@ namespace IntegratedParticlesNS {
             }
         }
 #endif
+
+
+#if PERIODIC_BOUNDARIES
+
+        __global__ void setusedGhosts(IntegratedParticles *integratedParticles, bool *usedGhosts){
+            integratedParticles->setusedGhosts(usedGhosts);
+        }
+
+        namespace Launch {
+                void setusedGhosts(IntegratedParticles *integratedParticles, bool *usedGhosts) {
+                    ExecutionPolicy executionPolicy(1, 1);
+                    cuda::launch(false, executionPolicy, ::IntegratedParticlesNS::Kernel::setusedGhosts, integratedParticles, usedGhosts);
+                }
+        }
+/*
+        __global__ void setPossibleGhosts(IntegratedParticles *integratedParticles, integer *possibleGhosts){
+            integratedParticles->setPossibleGhosts(possibleGhosts);
+        }
+
+        namespace Launch {
+                void setPossibleGhosts(IntegratedParticles *integratedParticles, integer *possibleGhosts) {
+                    ExecutionPolicy executionPolicy(1, 1);
+                    cuda::launch(false, executionPolicy, ::IntegratedParticlesNS::Kernel::setPossibleGhosts, integratedParticles, possibleGhosts);
+                }
+        }
+*/
+        __global__ void setMassGhosts(IntegratedParticles *integratedParticles, real *massGhosts){
+            integratedParticles->setMassGhosts(massGhosts);
+        }
+
+        namespace Launch {
+                void setMassGhosts(IntegratedParticles *integratedParticles, real *massGhosts) {
+                    ExecutionPolicy executionPolicy(1, 1);
+                    cuda::launch(false, executionPolicy, ::IntegratedParticlesNS::Kernel::setMassGhosts, integratedParticles, massGhosts);
+                }
+        }
+        __global__ void setNumGhosts(IntegratedParticles *integratedParticles, integer *numGhosts){
+            integratedParticles->setNumGhosts(numGhosts);
+        }
+
+        namespace Launch {
+                void setNumGhosts(IntegratedParticles *integratedParticles, integer *numGhosts) {
+                    ExecutionPolicy executionPolicy(1, 1);
+                    cuda::launch(false, executionPolicy, ::IntegratedParticlesNS::Kernel::setNumGhosts, integratedParticles, numGhosts);
+                }
+        }
+#endif
+
     }
 }
