@@ -7,7 +7,7 @@ std::ostream& Color::operator<<(std::ostream& os, const Color::Modifier& mod) {
 }
 
 Logger::Logger(typeLog type, bool toLog)
-    : Logger(type, toLog, true) {}
+    : Logger(type, toLog, LOGCOLOR) {}
 
 
 Logger::Logger(typeLog type, bool toLog, bool useColor) {

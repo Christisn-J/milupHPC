@@ -3,6 +3,8 @@
 #include "../include/integrator/predictor_corrector_euler.h"
 #include "../include/integrator/leapfrog.h"
 #include "../include/utils/config_parser.h"
+#include "../include/utils/compile_checks.h"
+#include "../include/constants.h"
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string.hpp>
 
@@ -15,24 +17,7 @@
 
 #define ENV_LOCAL_RANK "OMPI_COMM_WORLD_LOCAL_RANK"
 
-bool checkFile(const std::string file, bool terminate=false, const std::string message="");
-bool checkFile(const std::string file, bool terminate, const std::string message) {
-    std::ifstream fileStream(file.c_str());
-    if (fileStream.good()) {
-        return true;
-    }
-    else {
-        if (terminate) {
-            Logger(WARN) << message;
-            Logger(ERROR) << "Provided file: " << file << " not available!";
-            MPI_Finalize();
-            exit(0);
-        }
-        return false;
-    }
-}
-
-std::string getOutputDirectory(const std::string& configDir,
+std::string get_path_OutputDirectory(const std::string& configDir,
                                const std::string& parserDir,
                                const std::string& inputFile)
 {
@@ -60,53 +45,42 @@ std::string getOutputDirectory(const std::string& configDir,
     return trimmed;
 }
 
-bool checkOutputDirectory(const std::string& dir,
-                          bool terminate = false,
-                          const std::string& message = "")
-{
-    if (!dir.empty() && dir != "-") {
-        if (boost::filesystem::exists(dir)) {
-            if (!boost::filesystem::is_directory(dir)) {
-                Logger(ERROR) << "Path exists but is not a directory: " << dir;
-                if (terminate) {
-                    Logger(WARN) << message;
-                    MPI_Finalize();
-                    exit(0);
-                }
-                return false;
-            }
-        }
-        return true;
-    }
-
-    // Invalid directory
-    if (terminate) {
-        Logger(WARN) << message;
-        Logger(ERROR) << "No valid output directory provided!";
-        MPI_Finalize();
-        exit(0);
-    }
-
-    return false;
-}
 
 void createOutputDirectory(const std::string& dir, std::string& logDirOut)
 {
-    if (!boost::filesystem::exists(dir)) {
-        if (boost::filesystem::create_directories(dir)) {
+    namespace fs = boost::filesystem;
+
+    if (!fs::exists(dir)) {
+        if (fs::create_directories(dir)) {
             Logger(DEBUG) << "Created output directory: " << dir;
         } else {
             Logger(ERROR) << "Failed to create output directory: " << dir;
             MPI_Finalize();
-            exit(0);
+            exit(1);
         }
+    } else if (!fs::is_directory(dir)) {
+        Logger(ERROR) << "Output path exists but is not a directory: " << dir;
+        MPI_Finalize();
+        exit(1);
     }
 
-    logDirOut = dir + std::string{"log/"};
-    if (boost::filesystem::create_directories(logDirOut)) {
-        Logger(DEBUG) << "Created log directory: " << logDirOut;
+    logDirOut = dir + "/log/";
+
+    if (!fs::exists(logDirOut)) {
+        if (fs::create_directories(logDirOut)) {
+            Logger(DEBUG) << "Created log directory: " << logDirOut;
+        } else {
+            Logger(ERROR) << "Failed to create log directory: " << logDirOut;
+            MPI_Finalize();
+            exit(1);
+        }
+    } else if (!fs::is_directory(logDirOut)) {
+        Logger(ERROR) << "Log path exists but is not a directory: " << logDirOut;
+        MPI_Finalize();
+        exit(1);
     }
 }
+
 
 void SetDeviceBeforeInit()
 {
@@ -162,19 +136,19 @@ int main(int argc, char** argv)
     /// Command line argument parsing
     cxxopts::Options options("HPC NBody", "Multi-GPU CUDA Barnes-Hut NBody/SPH code");
 
-    bool loadBalancing = false;
+    bool loadBalancing = Default::loadBalancing;
 
     options.add_options()
-            ("n,number-output-files", "number of output files", cxxopts::value<int>()->default_value("100"))
-            ("t,max-time-step", "time step", cxxopts::value<real>()->default_value("-1."))
+            ("n,number-output-files", "number of output files", cxxopts::value<int>()->default_value(std::to_string(Default::numberFiles)))
+            ("t,max-time-step", "time step", cxxopts::value<real>()->default_value(DefaultValue<real>::str()))
             ("l,load-balancing", "load balancing", cxxopts::value<bool>(loadBalancing))
-            ("L,load-balancing-interval", "load balancing interval", cxxopts::value<int>()->default_value("-1"))
+            ("L,load-balancing-interval", "load balancing interval", cxxopts::value<int>()->default_value(DefaultValue<integer>::str()))
             ("C,config", "config file", cxxopts::value<std::string>()->default_value("config/config.info"))
             ("m,material-config", "material config file", cxxopts::value<std::string>()->default_value("config/material.cfg"))
-            ("c,curve-type", "curve type (Lebesgue: 0/Hilbert: 1)", cxxopts::value<int>()->default_value("-1"))
-            ("f,input-file", "File name", cxxopts::value<std::string>()->default_value("-"))
-			("o,output", "Output directory", cxxopts::value<std::string>()->default_value("-"))
-            ("v,verbosity", "Verbosity level", cxxopts::value<int>()->default_value("0"))
+            ("c,curve-type", "curve type (Lebesgue: 0/Hilbert: 1)", cxxopts::value<int>()->default_value(DefaultValue<integer>::str()))
+            ("f,input-file", "File name", cxxopts::value<std::string>()->default_value(DefaultValue<std::string>::str()))
+			("o,output", "Output directory", cxxopts::value<std::string>()->default_value(DefaultValue<std::string>::str()))
+            ("v,verbosity", "Verbosity level", cxxopts::value<int>()->default_value(std::to_string(Default::verbose_lvl)))
             ("h,help", "Show this help");
 
     cxxopts::ParseResult result;
@@ -202,7 +176,7 @@ int main(int argc, char** argv)
 
     /// Config file parsing
     std::string configFile = result["config"].as<std::string>();
-    checkFile(configFile, true, std::string{"Provided config file not available!"});
+    checkFileAvailable(configFile, true, std::string{"Provided config file not available!"});
 
     /// Collect settings/information in struct
     SimulationParameters parameters;
@@ -248,11 +222,12 @@ int main(int argc, char** argv)
 	std::string parserDir = result["output"].as<std::string>();
 	std::string inputFile = result["input-file"].as<std::string>();
 
+    // --- Output directory ---
 	// Step 1: Decide which directory to use
-	std::string finalOutputDir = getOutputDirectory(configDir, parserDir, inputFile);
+	std::string finalOutputDir = get_path_OutputDirectory(configDir, parserDir, inputFile);
 
 	// Step 2: Check if it's valid
-	checkOutputDirectory(finalOutputDir, true, "Output directory is invalid!");
+    checkDirectoryAvailable(finalOutputDir, true, "Output directory is invalid!");
 
 	// Step 3: Create directory (and log subdirectory)
 	std::string finalLogDir;
@@ -266,73 +241,103 @@ int main(int argc, char** argv)
     logFileName << parameters.logDirectory << "miluphpc.log";
     LOGCFG.logFileName = logFileName.str();
     Logger(TRACE) << "log file to: " << logFileName.str();
+
     //MPI_Finalize();
     //exit(0);
 
-    parameters.timeStep = confP.getVal<real>("timeStep");
+    // --- Time-related parameters ---
+    parameters.timeEnd = checkMinValue(confP.getVal<real>("timeEnd"), 0.0, InvalidValue<real>::value(), "timeEnd", "config", true);
+    parameters.timeStep = checkInRange(confP.getVal<real>("timeStep"), 0.0, parameters.timeEnd, InvalidValue<real>::value(), "timeStep", "config", true);
+
+    // Override maxTimeStep via command line if set, else use config
     parameters.maxTimeStep = result["max-time-step"].as<real>();
-    if (parameters.maxTimeStep < 0.) {
+    if (parameters.maxTimeStep < 0.0) {
         parameters.maxTimeStep = confP.getVal<real>("maxTimeStep");
     }
-    parameters.timeEnd = confP.getVal<real>("timeEnd");
+    parameters.maxTimeStep = checkInRange(parameters.maxTimeStep, 0.0, parameters.timeEnd, parameters.timeStep, "maxTimeStep");
+
+    // --- Output rank ---
     parameters.outputRank = confP.getVal<int>("outputRank");
-    if (parameters.outputRank < 0 || parameters.outputRank >= numProcesses) {
-        parameters.outputRank = -1; // if selected output rank is not valid, log all processes
-    }
+    parameters.outputRank = checkInRange(parameters.outputRank, 0, numProcesses - 1, DefaultValue<integer>::value(), "outputRank");
     LOGCFG.outputRank = parameters.outputRank;
-    parameters.performanceLog = confP.getVal<bool>("performanceLog");
-    parameters.particlesSent2H5 = confP.getVal<bool>("particlesSent2H5");
+
+    // --- SFC (Space-filling curve) ---
     parameters.sfcSelection = confP.getVal<int>("sfc");
-    if (result["curve-type"].as<int>() != -1) {
+    if (result["curve-type"].as<int>() != InvalidValue<integer>::value()) {
         parameters.sfcSelection = result["curve-type"].as<int>();
     }
-    parameters.integratorSelection = confP.getVal<int>("integrator");
-//#if GRAVITY_SIM
-    parameters.theta = confP.getVal<real>("theta");
-    parameters.smoothing = confP.getVal<real>("smoothing");
-    parameters.gravityForceVersion = confP.getVal<int>("gravityForceVersion");
-//#endif
-//#if SPH_SIM
-    parameters.smoothingKernelSelection = confP.getVal<int>("smoothingKernel");
-    parameters.sphFixedRadiusNNVersion = confP.getVal<int>("sphFixedRadiusNNVersion");
-//#endif
-    parameters.removeParticles = confP.getVal<bool>("removeParticles");
-    parameters.removeParticlesCriterion = confP.getVal<int>("removeParticlesCriterion");
-    parameters.removeParticlesDimension = confP.getVal<real>("removeParticlesDimension");
-    parameters.numOutputFiles = result["number-output-files"].as<int>();
-    parameters.timeKernels = true;
-    parameters.loadBalancing = confP.getVal<bool>("loadBalancing");
-    if (parameters.loadBalancing || loadBalancing) {
-        parameters.loadBalancing = true;
-    }
-    parameters.loadBalancingInterval = confP.getVal<int>("loadBalancingInterval");
-    if (result["load-balancing-interval"].as<int>() > 0) {
-        parameters.loadBalancingInterval = result["load-balancing-interval"].as<int>();
-    }
-    parameters.loadBalancingBins = confP.getVal<int>("loadBalancingBins");
-    parameters.verbosity = result["verbosity"].as<int>();
-    parameters.materialConfigFile = result["material-config"].as<std::string>();
-    parameters.inputFile = result["input-file"].as<std::string>();
-    parameters.particleMemoryContingent = confP.getVal<real>("particleMemoryContingent");
-    if (parameters.particleMemoryContingent > 1.0 || parameters.particleMemoryContingent < 0.0) {
-        parameters.particleMemoryContingent = 1.0;
-        Logger(WARN) << "Setting particle memory contingent to: " << parameters.particleMemoryContingent;
-    }
-    parameters.calculateCenterOfMass = confP.getVal<bool>("calculateCenterOfMass");
-    //TODO: apply those
-    parameters.calculateAngularMomentum = confP.getVal<bool>("calculateAngularMomentum");
-    parameters.calculateEnergy = confP.getVal<bool>("calculateEnergy");
+    parameters.sfcSelection = checkInRange(parameters.sfcSelection, 0, 1, 0, "sfcSelection");
 
-    // + 1 should not be necessary, but need to investigate whether this is a problem for 1 GPU sims
+    // --- Integrator ---
+    parameters.integratorSelection = confP.getVal<int>("integrator");
+    parameters.integratorSelection = checkInRange(parameters.integratorSelection, 0, 2, 0, "integratorSelection");
+
+    // --- Output files ---
+    parameters.numOutputFiles = checkMinValue(result["number-output-files"].as<int>(), 1, Default::numberFiles, "number-output-files");
+
+    // --- Load balancing interval ---
+    parameters.loadBalancingInterval = confP.getVal<int>("loadBalancingInterval");
+    int cliBalancingInterval = result["load-balancing-interval"].as<int>();
+    if (cliBalancingInterval > 0) {
+        parameters.loadBalancingInterval = cliBalancingInterval;
+    }
+    parameters.loadBalancingInterval = checkMinValue(parameters.loadBalancingInterval, 1, 10, "loadBalancingInterval");
+
+    parameters.loadBalancingBins = checkMinValue(confP.getVal<int>("loadBalancingBins"), 1, 2000, "loadBalancingBins");
+
+    // --- Verbosity ---
+    parameters.verbosity = checkInRange(result["verbosity"].as<int>(), 0, 2, Default::verbose_lvl, "verbosity");
+
+    // --- Material File ---
+    parameters.materialConfigFile = result["material-config"].as<std::string>();
+    if (!checkFileAvailable(parameters.materialConfigFile, false)) {
+        parameters.materialConfigFile = std::string{"config/material.cfg"};
+        checkFileAvailable(parameters.materialConfigFile, true, std::string{"Provided material config file and default (config/material.cfg) not available!"});
+    }
+
+    // --- Initial Condition File ---
+    parameters.inputFile = result["input-file"].as<std::string>();
+    checkFileAvailable(parameters.inputFile, true, "Provided input file not available!");
+
+    // --- Particle memory contingent ---
+    parameters.particleMemoryContingent = confP.getVal<real>("particleMemoryContingent");
+    parameters.particleMemoryContingent = checkInRange(parameters.particleMemoryContingent, 0.0, 1.0, 1.0, "particleMemoryContingent");
+
+    parameters.timeKernels = true;
+    parameters.performanceLog = checkBoolValue(confP, "performanceLog", false, "performanceLog");
+    parameters.particlesSent2H5 = checkBoolValue(confP, "particlesSent2H5", false, "particlesSent2H5");
+    parameters.removeParticles = checkBoolValue(confP, "removeParticles" , false, "removeParticles");
+
+    // Load balancing: kombinierte Auswertung aus config + CLI
+    bool configLB = checkBoolValue(confP, "loadBalancing", Default::loadBalancing);
+    bool cliLB    = checkBoolValue(result, "load-balancing", Default::loadBalancing);
+    parameters.loadBalancing = configLB || cliLB;
+
+
+//#if GRAVITY_SIM
+    parameters.theta = checkMinValue(confP.getVal<real>("theta"), 0.0, 0.5, "theta");
+    parameters.smoothing = checkMinValue(confP.getVal<real>("smoothing"), 0.0, 0.01, "smoothing");
+    parameters.gravityForceVersion = checkInRange(confP.getVal<int>("gravityForceVersion"), 0, 4, 0, "gravityForceVersion");
+//#endif
+
+//#if SPH_SIM
+    parameters.smoothingKernelSelection = checkInRange(confP.getVal<int>("smoothingKernel"), 0, 5, 0, "smoothingKernelSelection");
+    parameters.sphFixedRadiusNNVersion = checkInRange(confP.getVal<int>("sphFixedRadiusNNVersion"), 0, 3, 0, "sphFixedRadiusNNVersion");
+//#endif
+
+    parameters.removeParticlesCriterion = checkInRange(confP.getVal<int>("removeParticlesCriterion"), 0, 1, 0, "removeParticlesCriterion");
+    parameters.removeParticlesDimension = checkMinValue(confP.getVal<real>("removeParticlesDimension"), 0.0, 10.0, "removeParticlesDimension");
+
+
+//TODO: apply those
+    parameters.calculateCenterOfMass = checkBoolValue(confP, "calculateCenterOfMass", false, "calculateCenterOfMass");
+    parameters.calculateAngularMomentum = checkBoolValue(confP, "calculateAngularMomentum", false, "calculateAngularMomentum");
+    parameters.calculateEnergy = checkBoolValue(confP, "calculateEnergy", false, "calculateEnergy");
+
+
+// + 1 should not be necessary, but need to investigate whether this is a problem for 1 GPU sims
     parameters.domainListSize = POW_DIM * MAX_LEVEL * (numProcesses - 1) + 1;
     Logger(DEBUG) << "domainListSize: " << parameters.domainListSize;
-
-    if (!checkFile(parameters.materialConfigFile, false)) {
-        parameters.materialConfigFile = std::string{"config/material.cfg"};
-        checkFile(parameters.materialConfigFile, true,
-                  std::string{"Provided material config file and default (config/material.cfg) not available!"});
-    }
-    checkFile(parameters.inputFile, true, std::string{"Provided input file not available!"});
 
 
     /// H5 profiling/profiler

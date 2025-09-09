@@ -190,16 +190,17 @@ void Miluphpc::distributionFromFile(const std::string& filename) {
     // Check if dataset shape matches expected DIM
     std::vector<size_t> pos_dims = pos.getSpace().getDimensions();
 
+
     if (pos_dims.size() != 2) {
-        std::cerr << "Error: Dataset '/x' as not shape 2. Got " << pos_dims.size() << "D." << std::endl;
+        Logger(ERROR) << "Dataset '/x' does not have rank 2. Got " << pos_dims.size() << "D.";
         throw std::runtime_error("Invalid shape for dataset '/x'.");
     }
 
     if (pos_dims[1] != DIM) {
-        std::cerr << "Error: Position dataset '/x' has shape (" << pos_dims[0] << ", " << pos_dims[1]
-                  << "), but DIM is " << DIM << ". Aborting." << std::endl;
+        Logger(ERROR) << "Position dataset '/x' has shape (" << static_cast<int>(pos_dims[0]) << ", " << static_cast<int>(pos_dims[1]) << "), but DIM is " << DIM << ". Aborting.";
         throw std::runtime_error("Mismatch between dataset '/x' dimensions and compile-time DIM set in parameter.h.");
     }
+
     // Log the dataset shape
     Logger(DEBUG) << "Dataset '/x' has shape: (" << static_cast<int>(pos_dims[0]) << ", "<< static_cast<int>(pos_dims[1]) << ")";
 
