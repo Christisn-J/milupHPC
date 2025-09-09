@@ -39,7 +39,7 @@ namespace SPH {
      * @param particles Particles class instance
      * @param index Relevant particle index
      */
-    __device__ void SPH::calcPlasticity(Material *materials, int matId, Particles *particles, real sigma[DIM][DIM], int index);
+    __device__ void SPH::applyPlasticity(Material *materials, int matId, Particles *particles, int index);
 }
 #endif
 

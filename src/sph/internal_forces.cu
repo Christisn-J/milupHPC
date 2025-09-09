@@ -330,17 +330,19 @@ __global__ void SPH::Kernel::internalForces(::SPH::SPH_kernel kernel, Material *
             //printf("pij: vr = %e\n", vr);
 
 #if SOLID
+
+//#if PLASTICITY
+//            // add plasticity to S of i
+//            SPH::applyPlasticity(materials, matIdi, particles, i);
+//            // add plasticity to S of j
+//            SPH::applyPlasticity(materials, matIdj, particles, j);
+//#endif
             // get sigma_i
             SPH::calcStress(particles, sigma_i, i);
             // get sigma_j
             SPH::calcStress(particles, sigma_j, j);
 
-//#if PLASTICITY
-//            // plasticity scaling of sigma_i
-//            SPH::calcPlasticity(materials, matIdi, particles, sigma_i, i);
-//            // plasticity scaling of sigma_j
-//            SPH::calcPlasticity(materials, matIdj, particles, sigma_j, j);
-//#endif
+
             // calculate edot and rdot
             // edot_ab = 0.5 * (d_b v_a + d_a v_b)
             // rdot_ab = 0.5 * (d_b v_a - d_a v_b)
