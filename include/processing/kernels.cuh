@@ -10,8 +10,8 @@
 #ifndef MILUPHPC_KERNELS_CUH
 #define MILUPHPC_KERNELS_CUH
 
+#include "../constants.h"
 #include "../particles.cuh"
-#include "../parameter.h"
 #include "../materials/material.cuh"
 #include "cuda_utils/cuda_utilities.cuh"
 #include "cuda_utils/cuda_runtime.h"

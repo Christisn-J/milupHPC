@@ -10,9 +10,9 @@
 #ifndef MILUPHPC_SOUNDSPEED_CUH
 #define MILUPHPC_SOUNDSPEED_CUH
 
+#include "../constants.h"
 #include "../particles.cuh"
 #include "../subdomain_key_tree/subdomain.cuh"
-#include "../parameter.h"
 #include "../materials/material.cuh"
 #include "kernel.cuh"
 #include "cuda_utils/cuda_utilities.cuh"

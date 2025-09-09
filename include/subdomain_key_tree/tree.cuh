@@ -12,8 +12,8 @@
 #ifndef MILUPHPC_TREE_CUH
 #define MILUPHPC_TREE_CUH
 
+#include "../constants.h"
 #include "../cuda_utils/cuda_utilities.cuh"
-#include "../parameter.h"
 #include "../particles.cuh"
 
 #include <iostream>

@@ -15,13 +15,13 @@
 #ifndef MILUPHPC_SPH_CUH
 #define MILUPHPC_SPH_CUH
 
+#include "../constants.h"
 #include "../particles.cuh"
 #include "../subdomain_key_tree/subdomain.cuh"
-#include "../parameter.h"
 #include "../helper.cuh"
 #include "../materials/material.cuh"
-#include <float.h>
 
+#include <float.h>
 #include <boost/mpi.hpp>
 #include <assert.h>
 

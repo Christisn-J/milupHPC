@@ -18,7 +18,7 @@
 #ifndef MILUPHPC_CUDALAUNCHER_CUH
 #define MILUPHPC_CUDALAUNCHER_CUH
 
-#include "../parameter.h"
+#include "../constants.h"
 #include "cuda_utilities.cuh"
 
 #include <iostream>

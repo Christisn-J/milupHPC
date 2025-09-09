@@ -10,8 +10,8 @@
 #ifndef MILUPHPC_CUDA_RUNTIME_H
 #define MILUPHPC_CUDA_RUNTIME_H
 
+#include "../constants.h"
 #include "cuda_utilities.cuh"
-#include "../parameter.h"
 
 namespace cuda {
 

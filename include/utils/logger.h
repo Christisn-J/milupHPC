@@ -9,11 +9,12 @@
 #ifndef NBODY_LOGGER_H
 #define NBODY_LOGGER_H
 
+
+#include "../constants.h"
+#include "color.h"
+
 #include <iostream>
 #include <string>
-#include "color.h"
-#include "../parameter.h"
-#include <iostream>
 #include <fstream>
 
 namespace Color {

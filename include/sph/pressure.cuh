@@ -11,8 +11,8 @@
 #ifndef MILUPHPC_PRESSURE_CUH
 #define MILUPHPC_PRESSURE_CUH
 
+#include "../constants.h"
 #include "../particles.cuh"
-#include "../parameter.h"
 #include "../materials/material.cuh"
 #include "cuda_utils/cuda_utilities.cuh"
 #include "cuda_utils/cuda_runtime.h"

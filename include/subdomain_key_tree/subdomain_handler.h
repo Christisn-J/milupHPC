@@ -10,8 +10,9 @@
 #ifndef MILUPHPC_SUBDOMAIN_HANDLER_H
 #define MILUPHPC_SUBDOMAIN_HANDLER_H
 
-#include "../parameter.h"
+#include "../constants.h"
 #include "subdomain.cuh"
+
 #include <boost/mpi.hpp>
 
 //class KeyHandler {

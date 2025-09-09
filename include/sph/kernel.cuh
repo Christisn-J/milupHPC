@@ -8,14 +8,13 @@
 #ifndef MILUPHPC_KERNEL_CUH
 #define MILUPHPC_KERNEL_CUH
 
+#include "../constants.h"
 #include "../particles.cuh"
-#include "../parameter.h"
 #include "../helper.cuh"
-
-//#include <boost/mpi.hpp>
-#include <assert.h>
-#include "../parameter.h"
 #include "../cuda_utils/linalg.cuh"
+
+#include <assert.h>
+//#include <boost/mpi.hpp>
 
 namespace SPH {
 

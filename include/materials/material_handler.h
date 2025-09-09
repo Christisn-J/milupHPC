@@ -16,10 +16,10 @@
 #ifndef MILUPHPC_MATERIAL_HANDLER_H
 #define MILUPHPC_MATERIAL_HANDLER_H
 
-#include "material.cuh"
+#include "../constants.h"
 #include "../cuda_utils/cuda_runtime.h"
-#include "../parameter.h"
 #include "../utils/logger.h"
+#include "material.cuh"
 
 #include <fstream>
 #include <libconfig.h>
@@ -148,7 +148,7 @@ private:
         }
         if (!setting) {
             Logger(ERROR) << "Null config setting provided for material ID " << id;
-            *outValue = InvalidValue<T>::value;
+            *outValue = InvalidValue<T>::value();
             return;
         }
 
@@ -183,12 +183,12 @@ private:
             }
         } else {
             Logger(ERROR) << "lookupConfigValueOrDefault only supports 'integer' or 'real' types.";
-            *outValue = InvalidValue<T>::value;
+            *outValue = InvalidValue<T>::value();
             return;
         }
 
         Logger(WARN) << "Missing or unsupported type for parameter '" << name << "' in material ID " << id;
-        *outValue = InvalidValue<T>::value;
+        *outValue = InvalidValue<T>::value();
     }
 };
 

@@ -10,7 +10,7 @@
 #ifndef MILUPHPC_DOMAIN_CUH
 #define MILUPHPC_DOMAIN_CUH
 
-#include "../parameter.h"
+#include "../constants.h"
 #include "../cuda_utils/cuda_runtime.h"
 #include "../cuda_utils/cuda_utilities.cuh"
 #include "../helper_handler.h"

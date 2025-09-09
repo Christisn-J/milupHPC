@@ -18,8 +18,9 @@
 #ifndef MILUPHPC_PARTICLES_CUH
 #define MILUPHPC_PARTICLES_CUH
 
-#include "parameter.h"
+#include "constants.h"
 #include "cuda_utils/cuda_utilities.cuh"
+
 #include <cmath>
 #include <assert.h>
 

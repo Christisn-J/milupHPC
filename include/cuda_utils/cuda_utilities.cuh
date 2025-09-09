@@ -18,10 +18,11 @@
 #ifndef MILUPHPC_CUDAUTILITIES_CUH
 #define MILUPHPC_CUDAUTILITIES_CUH
 
+#include "../constants.h"
+
 #include <iostream>
 #include <cuda.h>
 #include <cuda_runtime.h>
-#include "../parameter.h"
 #include <assert.h>
 
 #ifdef __CUDACC__

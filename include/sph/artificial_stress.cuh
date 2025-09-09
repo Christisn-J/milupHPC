@@ -10,8 +10,8 @@
 #ifndef MILUPHPC_ARTIFICIAL_STRESS_CUH
 #define MILUPHPC_ARTIFICIAL_STRESS_CUH
 
+#include "../constants.h"
 #include "../particles.cuh"
-#include "../parameter.h"
 #include "../materials/material.cuh"
 
 namespace SPH {

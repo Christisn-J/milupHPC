@@ -10,8 +10,8 @@
 #ifndef MILUPHPC_STRESS_CUH
 #define MILUPHPC_STRESS_CUH
 
+#include "../constants.h"
 #include "../particles.cuh"
-#include "../parameter.h"
 
 namespace SPH {
         /**

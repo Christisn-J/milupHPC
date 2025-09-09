@@ -10,7 +10,7 @@
 #ifndef MILUPHPC_LINALG_CUH
 #define MILUPHPC_LINALG_CUH
 
-#include "../parameter.h"
+#include "../constants.h"
 #include "../../include/cuda_utils/cuda_utilities.cuh"
 
 class linalg {

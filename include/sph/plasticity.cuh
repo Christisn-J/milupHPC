@@ -24,8 +24,8 @@
 #ifndef MILUPHPC_PLASTICITY_CUH
 #define MILUPHPC_PLASTICITY_CUH
 
+#include "../constants.h"
 #include "../particles.cuh"
-#include "../parameter.h"
 #include "../materials/material.cuh"
 
 #if PLASTICITY

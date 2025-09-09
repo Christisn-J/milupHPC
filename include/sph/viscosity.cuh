@@ -11,8 +11,8 @@
 #ifndef MILUPHPC_VISCOSITY_CUH
 #define MILUPHPC_VISCOSITY_CUH
 
+#include "../constants.h"
 #include "../particles.cuh"
-#include "../parameter.h"
 #include "../materials/material.cuh"
 #include "kernel.cuh"
 #include "cuda_utils/cuda_utilities.cuh"

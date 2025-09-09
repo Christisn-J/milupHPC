@@ -16,17 +16,25 @@
 #ifndef CONFIGPARSER_H
 #define CONFIGPARSER_H
 
-#include <iostream>
-#include <string>
-#include <list>
-#include <boost/filesystem.hpp>
-#include <boost/property_tree/ptree.hpp>
-#include <boost/property_tree/json_parser.hpp>
-#include <boost/property_tree/info_parser.hpp>
-#include <boost/exception/exception.hpp>
-#include <boost/current_function.hpp>
-#include <boost/throw_exception.hpp>
-#include <boost/foreach.hpp>
+// -----------------------------
+// Standard Library
+// -----------------------------
+#include <iostream>    // For standard output (e.g., std::cout, std::cerr)
+#include <string>      // For using std::string
+#include <list>        // For using std::list (doubly-linked list from STL)
+
+// -----------------------------
+// Boost Libraries
+// -----------------------------
+#include <boost/filesystem.hpp>                     // For file and directory operations (checking existence, creating paths, etc.)
+#include <boost/property_tree/ptree.hpp>            // For the property tree data structure (hierarchical key-value pairs)
+#include <boost/property_tree/json_parser.hpp>      // For reading and writing JSON files into/from property trees
+#include <boost/property_tree/info_parser.hpp>      // For parsing Boost .info files into property trees
+#include <boost/exception/exception.hpp>            // For enhanced exception handling in Boost
+#include <boost/current_function.hpp>               // Provides current function name as string (useful for logging/debugging)
+#include <boost/throw_exception.hpp>                // For throwing Boost-compatible exceptions (especially when RTTI is disabled)
+#include <boost/foreach.hpp>                        // For BOOST_FOREACH macro (pre-C++11 range-based for loops)
+
 
 //#define BOOST_THROW_EXCEPTION(x) ::boost::throw_exception(x)
 

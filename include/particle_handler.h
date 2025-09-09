@@ -1,7 +1,7 @@
 #ifndef MILUPHPC_PARTICLE_HANDLER_H
 #define MILUPHPC_PARTICLE_HANDLER_H
 
-#include "parameter.h"
+#include "constants.h"
 #include "particles.cuh"
 #include "utils/logger.h"
 #include "cuda_utils/cuda_runtime.h"

@@ -13,12 +13,12 @@
 
 #include "../subdomain_key_tree/subdomain.cuh"
 #include "../materials/material.cuh"
-#include "kernel.cuh"
 #include "../cuda_utils/linalg.cuh"
 #include "../cuda_utils/cuda_utilities.cuh"
+#include "kernel.cuh"
 #include "stress.cuh"
-//#include "plasticity.cuh"
 #include "artificial_stress.cuh"
+//#include "plasticity.cuh"
 
 namespace SPH {
     namespace Kernel {

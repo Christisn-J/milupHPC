@@ -10,10 +10,11 @@
 #ifndef MILUPHPC_TREEHANDLER_H
 #define MILUPHPC_TREEHANDLER_H
 
-#include "tree.cuh"
-#include "../parameter.h"
+#include "../constants.h"
 #include "../utils/logger.h"
 #include "../cuda_utils/cuda_runtime.h"
+#include "tree.cuh"
+
 #include <boost/mpi.hpp>
 
 /**

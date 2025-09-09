@@ -16,8 +16,8 @@
 #ifndef MILUPHPC_MATERIAL_CUH
 #define MILUPHPC_MATERIAL_CUH
 
+#include "../constants.h"
 #include "../cuda_utils/cuda_utilities.cuh"
-#include "../parameter.h"
 
 #include <iostream>
 #include <stdio.h>

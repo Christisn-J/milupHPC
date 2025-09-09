@@ -1,8 +1,8 @@
 #ifndef MILUPHPC_HELPER_HANDLER_H
 #define MILUPHPC_HELPER_HANDLER_H
 
+#include "constants.h"
 #include "helper.cuh"
-#include "parameter.h"
 
 #include <mpi.h>
 

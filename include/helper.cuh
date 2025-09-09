@@ -1,11 +1,12 @@
 #ifndef MILUPHPC_HELPER_CUH
 #define MILUPHPC_HELPER_CUH
 
-#include "parameter.h"
-#include "cuda_utils/cuda_utilities.cuh"
-#include <boost/mpi.hpp>
+#include "constants.h"
 #include "utils/logger.h"
+#include "cuda_utils/cuda_utilities.cuh"
 #include "cuda_utils/cuda_runtime.h"
+
+#include <boost/mpi.hpp>
 
 struct Reduction
 {

@@ -8,8 +8,8 @@
 #ifndef MILUPHPC_KERNEL_HANDLER_H
 #define MILUPHPC_KERNEL_HANDLER_H
 
+#include "../constants.h"
 #include "kernel.cuh"
-#include "../parameter.h"
 
 namespace SPH {
 
