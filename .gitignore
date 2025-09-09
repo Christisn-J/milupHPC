@@ -1,9 +1,12 @@
 # Virtual environments
 .venv/
 
+**.bashrc
+
 # IDE files
 **/.idea/
 **/.DS_Store
+
 
 # Build and output directories
 **/build/
