@@ -96,6 +96,7 @@ int main(int argc, char** argv)
             ("m,material-config", "material config file", cxxopts::value<std::string>()->default_value("config/material.cfg"))
             ("c,curve-type", "curve type (Lebesgue: 0/Hilbert: 1)", cxxopts::value<int>()->default_value("-1"))
             ("f,input-file", "File name", cxxopts::value<std::string>()->default_value("-"))
+            ("o,output", "Output directory", cxxopts::value<std::string>()->default_value("-"))
             ("v,verbosity", "Verbosity level", cxxopts::value<int>()->default_value("0"))
             ("h,help", "Show this help");
 
@@ -167,6 +168,7 @@ int main(int argc, char** argv)
     LOGCFG.omitTime = confP.getVal<bool>("omitTime");
 
     parameters.directory = confP.getVal<std::string>("directory");
+    parameters.directory = result["output"].as<std::string>();
     if (boost::filesystem::create_directories(parameters.directory)) {
         Logger(DEBUG) << "Created directory: " << parameters.directory;
     }
