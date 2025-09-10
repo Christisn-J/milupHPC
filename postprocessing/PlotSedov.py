@@ -64,7 +64,7 @@ class SedovSolution(object):
         # Characterize the solution
         f_min = self.c2 if self.w1 > w else self.c6
 
-        f = np.logspace(np.log10(f_min), 0, 1e5)
+        f = np.logspace(np.log10(f_min), 0, int(1e5))
 
         # Sort the etas for our interpolation function
         eta = self.parametrized_eta(f)
@@ -395,7 +395,8 @@ if __name__ == '__main__':
             csv_writer.writerow(energy_analytical)
 
     fig.tight_layout()
-    fig.savefig("{}{}.png".format(args.output, os.path.basename(filename)))
+    print("{}{}.png".format(args.output, os.path.splitext(os.path.basename(filename))[0]))
+    fig.savefig("{}{}.png".format(args.output, os.path.splitext(os.path.basename(filename))[0]))
 
     if ".h5" in filename and ".csv" not in filename:
         h5f.close()
