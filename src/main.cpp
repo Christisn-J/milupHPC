@@ -167,8 +167,17 @@ int main(int argc, char** argv)
     LOGCFG.write2LogFile = confP.getVal<bool>("log");
     LOGCFG.omitTime = confP.getVal<bool>("omitTime");
 
-    parameters.directory = confP.getVal<std::string>("directory");
-    parameters.directory = result["output"].as<std::string>();
+    parameters.directory = (result["output"].as<std::string>() == "-") ? confP.getVal<std::string>("directory") : result["output"].as<std::string>();
+    if (boost::filesystem::create_directories(parameters.directory)) {
+        Logger(DEBUG) << "Created directory: " << parameters.directory;
+    }
+
+    parameters.logDirectory = parameters.directory + std::string{"log/"};
+
+    if (boost::filesystem::create_directories(parameters.logDirectory)) {
+        Logger(DEBUG) << "Created directory: " << parameters.logDirectory;
+    }
+
     if (boost::filesystem::create_directories(parameters.directory)) {
         Logger(DEBUG) << "Created directory: " << parameters.directory;
     }
