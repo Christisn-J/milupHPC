@@ -3277,7 +3277,7 @@ integer Miluphpc::sendParticles(T *sendBuffer, T *receiveBuffer, integer *sendLe
     //if (elapsed > 10.) {
     //Logger(INFO) << "sph: resending: receiveOffset: " << receiveOffset << ", sendOffset: " << sendOffset;
     //}
-
+    return 0
 }
 
 // used for assigning particles to corresponding process
