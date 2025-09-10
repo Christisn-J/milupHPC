@@ -8,6 +8,7 @@
 #ifndef MILUPHPC_UPDATEGHOSTSTATE_CUH
 #define MILUPHPC_UPDATEGHOSTSTATE_CUH
 
+#if PERIODIC_BOUNDARIES
 #include "../particles.cuh"
 #include "../sph/sph.cuh"
 #include "../parameter.h"
@@ -39,4 +40,5 @@ namespace SPH {
         }
     }
 }
+#endif
 #endif // MILUPHPC_UPDATEGHOSTSTATE_CUH 

@@ -7,7 +7,7 @@
  */
 #ifndef MILUPHPC_DENSITYGHOST_CUH
 #define MILUPHPC_DENSITYGHOST_CUH
-
+#if PERIODIC_BOUNDARIES
 #include "../particle_handler.h"
 #include "../particles.cuh"
 #include "../sph/sph.cuh"
@@ -52,5 +52,5 @@ namespace SPH {
 
     }
 }
-
+#endif
 #endif //MILUPHPC_DENSITYGHOST_CUH

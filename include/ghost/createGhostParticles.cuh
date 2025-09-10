@@ -7,7 +7,7 @@
  */
 #ifndef MILUPHPC_CREATGHOSTPARTICLES_CUH
 #define MILUPHPC_CREATGHOSTPARTICLES_CUH
-
+#if PERIODIC_BOUNDARIES
 #include "../particles.cuh"
 #include "../sph/sph.cuh"
 #include "../particle_handler.h"
@@ -54,4 +54,5 @@ namespace SPH {
         }
     }
 }
+#endif
 #endif // MILUPHPC_CREATGHOSTPARTICLES_CUH 

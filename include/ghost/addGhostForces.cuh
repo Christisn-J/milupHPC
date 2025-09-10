@@ -7,7 +7,7 @@
  */
 #ifndef MILUPHPC_ACCELERATEGHOST_CUH
 #define MILUPHPC_ACCELERATEGHOST_CUH
-
+#if PERIODIC_BOUNDARIES
 #include "../particles.cuh"
 #include "../sph/sph.cuh"
 #include "../sph/kernel.cuh"
@@ -53,5 +53,5 @@ namespace SPH {
 
     }
 }
-
+#endif
 #endif //MILUPHPC_ACCELERATEGHOST_CUH

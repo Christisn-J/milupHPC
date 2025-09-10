@@ -1,3 +1,4 @@
+#if PERIODIC_BOUNDARIES
 #include "../../include/ghost/createGhostParticles.cuh"
 #include "../../include/cuda_utils/cuda_launcher.cuh"
 
@@ -252,3 +253,4 @@ namespace SPH {
         }
     }
 }
+#endif

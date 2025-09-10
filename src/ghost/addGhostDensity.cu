@@ -1,3 +1,4 @@
+#if PERIODIC_BOUNDARIES
 #include "../../include/ghost/addGhostDensity.cuh"
 #include "../../include/cuda_utils/cuda_launcher.cuh"
 
@@ -57,3 +58,4 @@ namespace SPH {
         }
     }
 }
+#endif

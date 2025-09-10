@@ -106,6 +106,14 @@ typedef int idInteger;
 #define NUM_THREADS_LIMIT_TIME_STEP 256
 #define NUM_THREADS_CALC_CENTER_OF_MASS 256
 
+#define PERIODIC_BOUNDARIES 0
+//#if PERIODIC_BOUNDARIES
+#define MAX_NUM_GHOST_INTERACTIONS 180
+#define MAX_GHOSTS_PER_PARTICLE int(2*DIM-1)
+//#endif
+#define NUM_THREADS_LIMIT_TIME_STEP 256
+#define NUM_THREADS_CALC_CENTER_OF_MASS 256
+
 // Courant (CFL) number (note that our sml is defined up to the zero of the kernel, not half of it)
 #define COURANT_FACT 0.4
 
