@@ -36,7 +36,10 @@ if __name__ == "__main__":
     for h5file in sorted(glob.glob(os.path.join(args.data, "*.h5")), key=os.path.basename):
         print("Processing ", h5file, " ...")
         data = h5py.File(h5file, 'r')
-        time.append(data["time"][0])
+        if "time" in data:
+            time.append(data["time"][0])
+        else:
+            print(f"No 'time' dataset in file: {h5file}")
         # energy.append(data["E_tot"][()])
 
         if args.angular_momentum:
