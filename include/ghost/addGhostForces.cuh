@@ -7,12 +7,13 @@
  */
 #ifndef MILUPHPC_ACCELERATEGHOST_CUH
 #define MILUPHPC_ACCELERATEGHOST_CUH
+#include "../parameter.h"
 #if PERIODIC_BOUNDARIES
 #include "../particles.cuh"
 #include "../sph/sph.cuh"
 #include "../sph/kernel.cuh"
 #include "../particle_handler.h"
-#include "../parameter.h"
+
 
 
 class densityGhost {

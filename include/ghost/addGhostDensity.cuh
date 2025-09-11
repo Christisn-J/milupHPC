@@ -7,12 +7,14 @@
  */
 #ifndef MILUPHPC_DENSITYGHOST_CUH
 #define MILUPHPC_DENSITYGHOST_CUH
+
+#include "../parameter.h"
 #if PERIODIC_BOUNDARIES
 #include "../particle_handler.h"
 #include "../particles.cuh"
 #include "../sph/sph.cuh"
 #include "../sph/kernel.cuh"
-#include "../parameter.h"
+
 
 namespace SPH {
 

@@ -7,6 +7,7 @@
  */
 #ifndef MILUPHPC_NEARESTNEIGHBORSEARCHGHOST_CUH
 #define MILUPHPC_NEARESTNEIGHBORSEARCHGHOST_CUH
+#include "../parameter.h"
 #if PERIODIC_BOUNDARIES
 #include "../particles.cuh"
 #include "../sph/sph.cuh"
