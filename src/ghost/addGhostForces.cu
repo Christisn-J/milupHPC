@@ -1,11 +1,11 @@
-#include "parameter.h"
+#include "../../include/ghost/addGhostForces.cuh"
+#include "../../include/cuda_utils/cuda_launcher.cuh"
 #ifndef PERIODIC_BOUNDARIES
 #error "PERIODIC_BOUNDARIES is not defined!"
 #endif
 
 #if PERIODIC_BOUNDARIES
-#include "../../include/ghost/addGhostForces.cuh"
-#include "../../include/cuda_utils/cuda_launcher.cuh"
+
 
 namespace SPH {
 
