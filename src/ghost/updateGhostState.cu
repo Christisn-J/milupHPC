@@ -1,3 +1,8 @@
+#include "parameter.h"
+#ifndef PERIODIC_BOUNDARIES
+#error "PERIODIC_BOUNDARIES is not defined!"
+#endif
+
 #if PERIODIC_BOUNDARIES
 #include "../../include/ghost/updateGhostState.cuh"
 #include "../../include/cuda_utils/cuda_launcher.cuh"
