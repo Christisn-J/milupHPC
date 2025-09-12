@@ -28,7 +28,6 @@
 #include "../particles.cuh"
 #include "../materials/material.cuh"
 
-#if PLASTICITY
 namespace SPH {
     /**
      * @brief Limits the deviatoric stresses for various material models.
@@ -39,8 +38,7 @@ namespace SPH {
      * @param particles Particles class instance
      * @param index Relevant particle index
      */
-    __device__ void SPH::applyPlasticity(Material *materials, int matId, Particles *particles, int index);
+    __device__ void applyPlasticity(Material *materials, int matId, Particles *particles, int index);
+    __device__ void calcPlasticity(Material *materials, int matId, Particles *particles, real sigma[DIM][DIM], int index);
 }
-#endif
-
 #endif

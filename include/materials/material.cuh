@@ -121,6 +121,7 @@ struct EqOfSt {
         ar & till_beta;
         ar & rho_limit;
         ar & cs_limit;
+        ar & yield_stress;
     }
 
     int type;
@@ -131,6 +132,7 @@ struct EqOfSt {
     real n;
     real shear_modulus;
     real young_modulus;
+    real yield_stress;
 
     // Tillotson
     real till_A;
