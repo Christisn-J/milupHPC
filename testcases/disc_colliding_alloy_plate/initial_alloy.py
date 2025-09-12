@@ -3,6 +3,7 @@
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 import h5py
 import argparse
 import os
@@ -10,8 +11,6 @@ from datetime import datetime
 from scipy.spatial import cKDTree
 import logging
 logging.getLogger('matplotlib').setLevel(logging.WARNING)
-
-
 
 # === Material definitions ===
 MATERIALS = {
@@ -22,7 +21,41 @@ MATERIALS = {
 
 CUBE_LENGTH = 5.0e-2           # half edge length of cube (m)
 IMPACT_RADIUS = 0.5 * 6.35e-3  # sphere radius (m)
-IMPACT_SPEED = -0.059          # initial speed of impactor (m/s)
+IMPACT_SPEED = -5.9e-3         # initial speed of impactor (m/s)
+# IMPACT_SPEED = -5.9e-2          # initial speed of impactor (m/s)
+# impact_speed = -7e3  # m/s
+
+
+def find_sml_for_target_neighbors(tree, positions, target_range=(150, 180), h_initial=0.001, dim=3, tol=1):
+    """
+    Find a smoothing length h such that the average number of neighbors is within the target range.
+    Uses binary search between h_min and h_max.
+
+    Returns:
+        best_h (float): smoothing length
+        avg_neighbors (float): average number of neighbors at that h
+    """
+    h_min = h_initial * 0.5
+    h_max = h_initial * 3.0
+    best_h = None
+    best_avg_neighbors = 0
+
+    for _ in range(20):  # max 20 iterations
+        h_mid = 0.5 * (h_min + h_max)
+        neighbors = tree.query_ball_point(positions, r=h_mid)
+        avg_neighbors = np.mean([len(n) - 1 for n in neighbors])  # exclude self
+
+        if target_range[0] <= avg_neighbors <= target_range[1]:
+            best_h = h_mid
+            best_avg_neighbors = avg_neighbors
+            break  # found suitable h
+
+        if avg_neighbors < target_range[0]:
+            h_min = h_mid
+        else:
+            h_max = h_mid
+
+    return best_h, best_avg_neighbors
 
 # Funktion, um Materialdaten abzurufen
 def get_material_properties(material_key):
@@ -174,7 +207,7 @@ def main(dim, verbose, outDir, delta, dry):
 
     impact_radius = IMPACT_RADIUS  # m
     impact_speed = IMPACT_SPEED  # m/s
-    # impact_speed = -7000  # m/s
+
     cube_length = CUBE_LENGTH  # half edge length in meters
 
     mass = material["density"] * delta ** 3
@@ -216,6 +249,85 @@ def main(dim, verbose, outDir, delta, dry):
     logging.debug(f"Particles per m³ (cube): {len(target_particles)/volume_cube:.2e}")
     logging.debug(f"Particles per m³ (sphere): {len(impactor_particles)/volume_sphere:.2e}")
 
+    total_particles = np.concatenate((target_particles, impactor_particles))
+    positions = total_particles[:, :dim]
+
+    # Überprüfung auf doppelte Positionen
+    rounded_positions = np.round(positions, decimals=10)
+    unique_positions = np.unique(rounded_positions, axis=0)
+
+    if len(unique_positions) != len(rounded_positions):
+        duplicates = len(rounded_positions) - len(unique_positions)
+        logging.warning(f"{duplicates} doppelte Partikelposition(en) erkannt!")
+    else:
+        logging.info("Keine doppelten Partikelpositionen gefunden.")
+
+    tree = cKDTree(positions)
+    distances, indices = tree.query(positions, k=2)
+    nearest_distances = distances[:, 1]
+    average_distance = np.mean(nearest_distances)
+    logging.info(f"Average particle nearest-neighbor distance: {average_distance:.6e} m ~ delta ={delta:.6e} m")
+
+    if average_distance < 0.5 * delta:
+        logging.warning("Average particle spacing is suspiciously low compared to delta!")
+
+
+    logging.debug(f"Nearest-neighbor stats:")
+    logging.debug(f"  min: {np.min(nearest_distances):.3e} m")
+    logging.debug(f"  max: {np.max(nearest_distances):.3e} m")
+    logging.debug(f"  mean: {np.mean(nearest_distances):.3e} m")
+    logging.debug(f"  std: {np.std(nearest_distances):.3e} m")
+
+    # === SPH Smoothing Length Vorschlag ===
+    eta = 1.3  # Sicherheitsfaktor eta ∈ [1.2, 2.0]
+    smoothing_length = eta * average_distance
+    logging.info(f"Empfohlene Smoothing Length h ≈ {smoothing_length:.6e} m (η = {eta}, average_distance = {average_distance:.6e})")
+
+    if smoothing_length < delta:
+        logging.warning("Vorgeschlagene smoothing length ist kleiner als delta! SPH-Ergebnisse können ungenau sein.")
+    elif smoothing_length < 1.1 * delta:
+        logging.warning("Smoothing length ist nur minimal größer als delta – eventuell zu wenig Nachbarn.")
+
+
+    # === Automatische SML-Suche für Nachbarn ===
+    target_min_neighbors = 30
+    target_max_neighbors = 180
+
+    best_h, best_avg_n = find_sml_for_target_neighbors(
+        tree,
+        positions,
+        target_range=(target_min_neighbors, target_max_neighbors),
+        h_initial=smoothing_length,
+        dim=dim
+    )
+
+    if best_h is not None:
+        logging.info(f"Gefundene SML für {target_min_neighbors}–{target_max_neighbors} Nachbarn:")
+        logging.info(f"  h ≈ {best_h:.6e} m  → durchschnittlich {best_avg_n:.1f} Nachbarn")
+        smoothing_length=best_h
+    else:
+        logging.warning("Keine geeignete SML im getesteten Bereich gefunden.")
+
+    # === Berechne max. Anzahl an Nachbarn innerhalb der SML ===
+    logging.info("Berechne Anzahl von Nachbarn pro Partikel innerhalb der smoothing length h...")
+
+    neighbors_per_particle = tree.query_ball_point(positions, r=smoothing_length)
+
+    num_neighbors = np.array([len(neighs) - 1 for neighs in neighbors_per_particle])  # -1: exclude self
+
+    max_neighbors = np.max(num_neighbors)
+    min_neighbors = np.min(num_neighbors)
+    avg_neighbors = np.mean(num_neighbors)
+    std_neighbors = np.std(num_neighbors)
+
+    logging.info(f"Nachbarn innerhalb SML (h = {smoothing_length:.2e} m):")
+    logging.info(f"  max:  {max_neighbors}")
+    logging.info(f"  min:  {min_neighbors}")
+    logging.info(f"  mean: {avg_neighbors:.2f}")
+    logging.info(f"  std:  {std_neighbors:.2f}")
+
+
+
 
     # Visualization
     fig = plt.figure(figsize=(10, 7))
@@ -247,13 +359,38 @@ def main(dim, verbose, outDir, delta, dry):
         ax.scatter(target_particles[:, 0], target_particles[:, 1], color='b', s=1, label='Al6061 Cube')
         ax.scatter(impactor_particles[:, 0], impactor_particles[:, 1], color='r', s=1, label='Impactor Sphere')
 
-        ax.quiver(target_particles[::skip_target, 0], target_particles[::skip_target, 1],
-                  target_particles[::skip_target, 3], target_particles[::skip_target, 4],
-                  color='b', scale=abs(impact_speed) * 2)
+        # === Velocity-Pfeile zeichnen, wenn nicht Null ===
+        if not np.allclose(target_particles[:, 3:5], 0):
+            ax.quiver(target_particles[::skip_target, 0], target_particles[::skip_target, 1],
+                      target_particles[::skip_target, 3], target_particles[::skip_target, 4],
+                      color='b', scale=1.0, scale_units='xy')
 
-        ax.quiver(impactor_particles[::skip_impact, 0], impactor_particles[::skip_impact, 1],
-                  impactor_particles[::skip_impact, 3], impactor_particles[::skip_impact, 4],
-                  color='orange', scale=abs(impact_speed) * 2)
+        if not np.allclose(impactor_particles[:, 3:5], 0):
+            ax.quiver(impactor_particles[::skip_impact, 0], impactor_particles[::skip_impact, 1],
+                      impactor_particles[::skip_impact, 3], impactor_particles[::skip_impact, 4],
+                      color='orange', scale=1.0, scale_units='xy')
+
+        # === Smoothing-Length-Kreis einzeichnen (z.B. um Partikel 0 im Target) ===
+        cube_center = np.array([0.0] * dim)
+        target_positions = target_particles[:, :dim]
+
+        # euklidische Abstände zur Mitte berechnen
+        distances_to_center = np.linalg.norm(target_positions - cube_center, axis=1)
+
+        # Index des Partikels mit minimalem Abstand zur Cube-Mitte
+        highlight_idx = np.argmin(distances_to_center)
+
+        x0, y0 = target_particles[highlight_idx, 0], target_particles[highlight_idx, 1]
+
+        circle = patches.Circle(
+            (x0, y0),
+            radius=smoothing_length,
+            edgecolor='purple',
+            facecolor='purple',
+            alpha=0.2,
+            label=f"SML (h ≈ {smoothing_length:.2e} m)"
+        )
+        ax.add_patch(circle)
 
         ax.set_xlabel('X-Axis')
         ax.set_ylabel('Y-Axis')
@@ -266,11 +403,11 @@ def main(dim, verbose, outDir, delta, dry):
 
         ax.quiver(target_particles[::skip_target, 0], np.zeros_like(target_particles[::skip_target, 0]),
                   target_particles[::skip_target, 3], np.zeros_like(target_particles[::skip_target, 0]),
-                  color='b', scale=abs(impact_speed) * 2)
+                  color='b', scale=1.0, scale_units='xy')
 
         ax.quiver(impactor_particles[::skip_impact, 0], np.zeros_like(impactor_particles[::skip_impact, 0]),
                   impactor_particles[::skip_impact, 3], np.zeros_like(impactor_particles[::skip_impact, 0]),
-                  color='orange', scale=abs(impact_speed) * 2)
+                  color='orange', scale=1.0, scale_units='xy')
 
         ax.set_xlabel('X-Axis')
         ax.set_yticks([])  # hide y-axis ticks in 1D
@@ -294,33 +431,33 @@ def main(dim, verbose, outDir, delta, dry):
 
 
 
-    positions = total_particles[:, :dim]
-
-    # Überprüfung auf doppelte Positionen
-    rounded_positions = np.round(positions, decimals=10)
-    unique_positions = np.unique(rounded_positions, axis=0)
-
-    if len(unique_positions) != len(rounded_positions):
-        duplicates = len(rounded_positions) - len(unique_positions)
-        logging.warning(f"{duplicates} doppelte Partikelposition(en) erkannt!")
-    else:
-        logging.info("Keine doppelten Partikelpositionen gefunden.")
-
-    tree = cKDTree(positions)
-    distances, indices = tree.query(positions, k=2)
-    nearest_distances = distances[:, 1]
-    average_distance = np.mean(nearest_distances)
-    logging.info(f"Average particle nearest-neighbor distance: {average_distance:.6e} m ~ delta ={delta:.6e} m")
-
-    if average_distance < 0.5 * delta:
-        logging.warning("Average particle spacing is suspiciously low compared to delta!")
-
-
-    logging.debug(f"Nearest-neighbor stats:")
-    logging.debug(f"  min: {np.min(nearest_distances):.3e} m")
-    logging.debug(f"  max: {np.max(nearest_distances):.3e} m")
-    logging.debug(f"  mean: {np.mean(nearest_distances):.3e} m")
-    logging.debug(f"  std: {np.std(nearest_distances):.3e} m")
+    # positions = total_particles[:, :dim]
+    #
+    # # Überprüfung auf doppelte Positionen
+    # rounded_positions = np.round(positions, decimals=10)
+    # unique_positions = np.unique(rounded_positions, axis=0)
+    #
+    # if len(unique_positions) != len(rounded_positions):
+    #     duplicates = len(rounded_positions) - len(unique_positions)
+    #     logging.warning(f"{duplicates} doppelte Partikelposition(en) erkannt!")
+    # else:
+    #     logging.info("Keine doppelten Partikelpositionen gefunden.")
+    #
+    # tree = cKDTree(positions)
+    # distances, indices = tree.query(positions, k=2)
+    # nearest_distances = distances[:, 1]
+    # average_distance = np.mean(nearest_distances)
+    # logging.info(f"Average particle nearest-neighbor distance: {average_distance:.6e} m ~ delta ={delta:.6e} m")
+    #
+    # if average_distance < 0.5 * delta:
+    #     logging.warning("Average particle spacing is suspiciously low compared to delta!")
+    #
+    #
+    # logging.debug(f"Nearest-neighbor stats:")
+    # logging.debug(f"  min: {np.min(nearest_distances):.3e} m")
+    # logging.debug(f"  max: {np.max(nearest_distances):.3e} m")
+    # logging.debug(f"  mean: {np.mean(nearest_distances):.3e} m")
+    # logging.debug(f"  std: {np.std(nearest_distances):.3e} m")
 
 
     plt.tight_layout()
