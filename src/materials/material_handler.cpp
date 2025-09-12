@@ -276,7 +276,7 @@ MaterialHandler::MaterialHandler(const char *material_cfg) {
         h_materials[id].eos.young_modulus = -1.0;
 #endif
 
-
+        lookupConfigValueOrDefault(subset, "yield_stress", &h_materials[id].eos.yield_stress, id);
 #if DEBUGGING
         Logger(DEBUG) << "Reading Tillotson parameters for material ID " << id;
 #endif

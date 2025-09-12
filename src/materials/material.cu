@@ -26,6 +26,7 @@ CUDA_CALLABLE_MEMBER void Material::info() {
     printf("Material: eos: n                                    = %f\n", eos.n);
     printf("Material: eos: shear_modulus                        = %f\n", eos.shear_modulus);
     printf("Material: eos: young_modulus                        = %f\n", eos.young_modulus);
+    printf("Material: eos: yield_stress                         = %f\n", eos.yield_stress);
     // Artificial Stress Parameters
 #if ARTIFICIAL_STRESS
     printf("Material: artificial Stress: exponent tensor        = %f\n", artificialStress.exponent_tensor);
