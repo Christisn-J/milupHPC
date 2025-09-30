@@ -3739,6 +3739,7 @@ real Miluphpc::particles2file(int step) {
                 {std::size_t(numParticlesLocal), std::size_t(DIM)}).write(x);
     vel.select({nOffset, 0},
                 {std::size_t(numParticlesLocal), std::size_t(DIM)}).write(v);
+
 	acc.select({nOffset, 0},
                 {std::size_t(numParticlesLocal), std::size_t(DIM)}).write(a);
     key.select({nOffset}, {std::size_t(numParticlesLocal)}).write(k);
