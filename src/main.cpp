@@ -198,13 +198,17 @@ int main(int argc, char** argv)
     }
     //LOGCFG.level = static_cast<typeLog>(1); //TRACE; //DEBUG;
     LOGCFG.rank = rank;
-    //LOGCFG.outputRank = 0;
-    //Logger(DEBUG) << "DEBUG output";
-    //Logger(WARN) << "WARN output";
-    //Logger(ERROR) << "ERROR output";
-    //Logger(INFO) << "INFO output";
-    //Logger(TRACE) << "TRACE output";
-    //Logger(TIME) << "TIME output";
+
+#if DEBUGGING
+    LOGCFG.outputRank = 0;
+    Logger(DEBUG) << "DEBUG output";
+    Logger(CHECK) << "CHECK output";
+    Logger(WARN) << "WARN output";
+    Logger(ERROR) << "ERROR output";
+    Logger(INFO) << "INFO output";
+    Logger(TRACE) << "TRACE output";
+    Logger(TIME) << "TIME output";
+#endif
 
     Logger(DEBUG) << "rank: " << rank << " | number of processes: " << numProcesses;
     Logger(DEBUG) << "device: " << device << " | num devices: " << numDevices;
@@ -246,6 +250,7 @@ int main(int argc, char** argv)
     //exit(0);
 
     // --- Time-related parameters ---
+    Logger(CHECK) << "Configuration values:";
     parameters.timeEnd = checkMinValue(confP.getVal<real>("timeEnd"), 0.0, InvalidValue<real>::value(), "timeEnd", "config", true);
     parameters.timeStep = checkInRange(confP.getVal<real>("timeStep"), 0.0, parameters.timeEnd, InvalidValue<real>::value(), "timeStep", "config", true);
 
@@ -286,7 +291,7 @@ int main(int argc, char** argv)
     parameters.loadBalancingBins = checkMinValue(confP.getVal<int>("loadBalancingBins"), 1, 2000, "loadBalancingBins");
 
     // --- Verbosity ---
-    parameters.verbosity = checkInRange(result["verbosity"].as<int>(), 0, 2, Default::verbose_lvl, "verbosity");
+    parameters.verbosity = checkInRange(result["verbosity"].as<int>(), 0, 3, Default::verbose_lvl, "verbosity");
 
     // --- Material File ---
     parameters.materialConfigFile = result["material-config"].as<std::string>();
@@ -337,6 +342,8 @@ int main(int argc, char** argv)
 
 // + 1 should not be necessary, but need to investigate whether this is a problem for 1 GPU sims
     parameters.domainListSize = POW_DIM * MAX_LEVEL * (numProcesses - 1) + 1;
+    Logger(CHECK) << "Configuration parameters validated and loaded.";
+
     Logger(DEBUG) << "domainListSize: " << parameters.domainListSize;
 
 
