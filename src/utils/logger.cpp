@@ -62,6 +62,7 @@ inline std::string Logger::getLabel(typeLog type) {
     }
     switch(type) {
         case DEBUG: label = "[DEBUG] "; break;
+        case CHECK: label = "[CHECK] "; break;
         case INFO:  label = "[INFO ] "; break;
         case TRACE: label = "[TRACE] "; break;
         case WARN:  label = "[WARN ] "; break;
@@ -75,6 +76,7 @@ inline Color::Modifier Logger::getColor(typeLog type) {
     Color::Modifier color(Color::FG_DEFAULT);
     switch(type) {
         case DEBUG: color.code = Color::FG_DARK_GRAY; break;
+        case CHECK: color.code = Color::FG_CYAN; break;
         case INFO:  color.code = Color::FG_LIGHT_GREEN; break;
         case TRACE: color.code = Color::FG_WHITE; break;
         case WARN:  color.code = Color::FG_YELLOW; break;

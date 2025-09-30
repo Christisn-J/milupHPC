@@ -46,6 +46,7 @@ namespace Color {
 /// logging types
 enum typeLog {
     DEBUG, /// debug log type
+    CHECK, /// check log type
     INFO, /// info log type
     TRACE, /// trace log type
     WARN, /// warning log type
