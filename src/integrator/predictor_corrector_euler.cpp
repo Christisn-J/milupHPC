@@ -111,6 +111,13 @@ void PredictorCorrectorEuler::integrate(int step) {
         //Logger(INFO) << "h_dt_max = " << *simulationTimeHandler->h_dt_max;
         // ------------------------------------------------------------------------------------------------------------
         Logger(INFO) << "PREDICTOR!";
+
+#if DEBUGGING
+        Logger(CHECK) << "checking for NANs before predictor...";
+        ParticlesNS::Kernel::Launch::check4nans(particleHandler->d_particles, numParticlesLocal);
+		cudaDeviceSynchronize();
+#endif
+
         time += PredictorCorrectorEulerNS::Kernel::Launch::predictor(particleHandler->d_particles,
                                                                      integratedParticles[0].d_integratedParticles,
                                                                      *simulationTimeHandler->h_dt, //(real) simulationParameters.timestep,
@@ -118,6 +125,12 @@ void PredictorCorrectorEuler::integrate(int step) {
 
         Logger(INFO) << "setPointer()...";
         particleHandler->setPointer(&integratedParticles[0]);
+
+#if DEBUGGING
+        Logger(CHECK) << "checking for NANs after predictor...";
+        ParticlesNS::Kernel::Launch::check4nans(particleHandler->d_particles, numParticlesLocal);
+		cudaDeviceSynchronize();
+#endif
 
         timerRhs.reset();
         // -------------------------------------------------------------------------------------------------------------
@@ -133,12 +146,26 @@ void PredictorCorrectorEuler::integrate(int step) {
         particleHandler->resetPointer();
 
         Logger(INFO) << "CORRECTOR!";
+
+#if DEBUGGING
+        Logger(CHECK) << "checking for NANs after corrector...";
+        ParticlesNS::Kernel::Launch::check4nans(particleHandler->d_particles, numParticlesLocal);
+		cudaDeviceSynchronize();
+#endif
+
         time += PredictorCorrectorEulerNS::Kernel::Launch::corrector(particleHandler->d_particles,
                                                                      integratedParticles[0].d_integratedParticles,
                                                                      *simulationTimeHandler->h_dt, //(real) simulationParameters.timestep,
                                                                      numParticlesLocal);
 
         Logger(INFO) << "CORRECTOR FINISHED!";
+
+#if DEBUGGING
+        Logger(CHECK) << "checking for NANs after corrector...";
+        ParticlesNS::Kernel::Launch::check4nans(particleHandler->d_particles, numParticlesLocal);
+		cudaDeviceSynchronize();
+#endif
+
         *simulationTimeHandler->h_currentTime += *simulationTimeHandler->h_dt;
         simulationTimeHandler->copy(To::device);
 

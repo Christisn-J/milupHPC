@@ -50,8 +50,11 @@ void ExplicitEuler::integrate(int step) {
         Logger(TIME) << "rhs::loadBalancing(): " << elapsed << " ms";
         profiler.value2file(ProfilerIds::Time::loadBalancing, elapsed);
 
-        //Logger(INFO) << "checking for nans before update() ..";
-        //ParticlesNS::Kernel::Launch::check4nans(particleHandler->d_particles, numParticlesLocal);
+#if DEBUGGING
+        Logger(CHECK) << "checking for NANs before update() ..";
+        ParticlesNS::Kernel::Launch::check4nans(particleHandler->d_particles, numParticlesLocal);
+		cudaDeviceSynchronize();
+#endif
 
         timer.reset();
         //real time;
@@ -96,8 +99,11 @@ void ExplicitEuler::integrate(int step) {
 
     }
 
-    //Logger(INFO) << "checking for nans after update()...";
-    //ParticlesNS::Kernel::Launch::check4nans(particleHandler->d_particles, numParticlesLocal);
+#if DEBUGGING
+    Logger(CHECK) << "checking for NANs after update()...";
+    ParticlesNS::Kernel::Launch::check4nans(particleHandler->d_particles, numParticlesLocal);
+	cudaDeviceSynchronize();
+#endif
 
 
 
