@@ -15,25 +15,27 @@ matplotlib.use('Agg')
 
 # Predefined selections of keys for plotting
 SELECTS = {
-    0: {"name": "mass & velocity",                                  "keys": ["m", "v"]},
-    1: {"name": "density rate",                                     "keys": ["drhodt"]},
-    2: {"name": "density, pressure, energy, speed of sound",        "keys": ["rho", "p", "e", "cs"]},
-    3: {"name": "process, smoothing length, number of interactions","keys": ["proc", "sml", "noi"]},
-    4: {"name": "stress components",                                "keys": ["Sxx", "Sxy", "Sxz", "Syz"]}
+    0: {"name": "mass & velocity", "slug": "mass_velocity", "keys": ["m", "v", "a"]},
+    1: {"name": "density rate", "slug": "density_rate", "keys": ["drhodt"]},
+    2: {"name": "density, pressure, energy, speed of sound", "slug": "density_pressure_energy_speedOfSound", "keys": ["rho", "p", "e", "cs"]},
+    3: {"name": "process, smoothing length, number of interactions", "slug": "process_smoothingLength_numberOfInteractions", "keys": ["proc", "sml", "noi"]},
+    4: {"name": "stress components", "slug": "stress_components", "keys": ["Sxx", "Sxy", "Sxz", "Syz"]}
 }
+
 
 # Metadata for each field: display name, LaTeX symbol, unit, and colormap
 FIELD_META = {
-    "x":    {"name": "Position",         "symbol": r"$\vec{r}$",       "unit": r"$\mathrm{m}$",                                         "cmap": "gray"},
+    "x":    {"name": "Position",         "symbol": r"$\vec{r}$",       "unit": r"$\mathrm{m}$",                               "cmap": "gray"},
+    "a":    {"name": "Acceleration",     "symbol": r"$\vec{a}$",       "unit": r"$\frac{\mathrm{m}}{\mathrm{s}^2}$",          "cmap": "inferno"},
     "m":    {"name": "Mass",             "symbol": r"$m$",             "unit": r"$\mathrm{kg}$",                              "cmap": "viridis"},
     "v":    {"name": "Velocity",         "symbol": r"$\vec{v}$",       "unit": r"$\frac{\mathrm{m}}{\mathrm{s}}$",            "cmap": "plasma"},
     "rho":  {"name": "Density",          "symbol": r"$\rho$",          "unit": r"$\frac{\mathrm{kg}}{\mathrm{m}^3}$",         "cmap": "viridis"},
     "p":    {"name": "Pressure",         "symbol": r"$p$",             "unit": r"$\mathrm{Pa}$",                              "cmap": "plasma"},
     "e":    {"name": "Energy",           "symbol": r"$\epsilon$",      "unit": r"$\mathrm{J}$",                               "cmap": "inferno"},
     "cs":   {"name": "Speed of Sound",   "symbol": r"$c_s$",           "unit": r"$\frac{\mathrm{m}}{\mathrm{s}}$",            "cmap": "magma"},
-    "proc": {"name": "Process",          "symbol": r"$\mathrm{proc}$", "unit": r"$-$",                                         "cmap": "tab20"},
+    "proc": {"name": "Process",          "symbol": r"$\mathrm{proc}$", "unit": r"$-$",                                        "cmap": "tab20"},
     "sml":  {"name": "Smoothing Length", "symbol": r"$h$",             "unit": r"$\mathrm{m}$",                               "cmap": "viridis"},
-    "noi":  {"name": "Number of Interactions","symbol": r"$\mathrm{noi}$",  "unit": r"$-$",                                         "cmap": "plasma"},
+    "noi":  {"name": "Number of Interactions","symbol": r"$\mathrm{noi}$",  "unit": r"$-$",                                   "cmap": "plasma"},
     "Sxx":  {"name": "Stress XX",        "symbol": r"$\sigma_{xx}$",   "unit": r"$\mathrm{Pa}$",                              "cmap": "coolwarm"},
     "Sxy":  {"name": "Stress XY",        "symbol": r"$\sigma_{xy}$",   "unit": r"$\mathrm{Pa}$",                              "cmap": "coolwarm"},
     "Sxz":  {"name": "Stress XZ",        "symbol": r"$\sigma_{xz}$",   "unit": r"$\mathrm{Pa}$",                              "cmap": "coolwarm"},
@@ -53,12 +55,14 @@ AXES_CONFIG = {
     "z": {"limits": (-1, 1), "labels": f'z [{FIELD_META["x"]["unit"]}]', "index": 2}
 }
 
-def setup_logging():
+def setup_logging(time=False):
     """
     Configures the logging format and level.
     """
+    log_format = "%(asctime)s [%(levelname)s] %(message)s" if time else "[%(levelname)s] %(message)s"
+
     logging.basicConfig(
-        format="%(asctime)s [%(levelname)s] %(message)s",
+        format=log_format,
         level=logging.INFO
     )
 def get_global_extrema(file_list, key, is_vector=False):
@@ -363,7 +367,7 @@ def main(args):
                     data_select[key] = None  # Mark missing data as None
 
         # Set output filename and extension
-        filename = f"ts{i:06d}_{SELECTS[args.plot_type]["name"]}"
+        filename = f"ts{i:06d}_{SELECTS[args.plot_type]["slug"]}"
         title = f"Timestep {i}"
         data = [data_select.get(key) for key in keys]
         cmaps = [FIELD_META[key]["cmap"] for key in keys]
