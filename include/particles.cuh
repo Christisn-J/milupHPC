@@ -589,12 +589,29 @@ namespace ParticlesNS {
     namespace Kernel {
 
         /**
+         * Debug function to search for *out of bounds* in the entries.
+         *
+         * @param particles Particle class instance
+         * @param n number of particles (to be searched)
+         */
+        __global__ void check4outOfBounds(Particles *particles, integer n);
+
+        /**
+         * Debug function to search for *zeros* in the entries.
+         *
+         * @param particles Particle class instance
+         * @param n number of particles (to be searched)
+         */
+        __global__ void check4zeros(Particles *particles, integer n);
+
+        /**
          * Debug function to search for *NANs* in the entries.
          *
          * @param particles Particle class instance
          * @param n number of particles (to be searched)
          */
         __global__ void check4nans(Particles *particles, integer n);
+
 
         /**
          * Debug/Info Kernel (for debugging purposes)
@@ -607,6 +624,20 @@ namespace ParticlesNS {
         __global__ void info(Particles *particles, integer n, integer m, integer k);
 
         namespace Launch {
+
+            /**
+             * Wrapper function for ParticlesNS::check4outOfBounds().
+             *
+             * @return Wall time of execution.
+             */
+            real check4outOfBounds(Particles *particles, integer n);
+
+            /**
+             * Wrapper function for ParticlesNS::check4zeros().
+             *
+             * @return Wall time of execution.
+             */
+            real check4zeros(Particles *particles, integer n);
 
             /**
              * Wrapper function for ParticlesNS::check4nans().

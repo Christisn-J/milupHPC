@@ -449,6 +449,63 @@ namespace ParticlesNS {
             }
         }*/
 
+
+        __global__ void check4zeros(Particles *particles, integer n) {
+            int bodyIndex = threadIdx.x + blockDim.x * blockIdx.x;
+            int stride = blockDim.x * gridDim.x;
+            int offset = 0;
+            while ((bodyIndex + offset) < n) {
+                if (particles->mass[bodyIndex + offset] == 0. || particles->sml[bodyIndex + offset] == 0.) {
+#if DIM == 1
+                    printf("ATTENTION for index: %i (%f) %f\n", bodyIndex + offset,
+                               particles->x[bodyIndex + offset],
+                               particles->mass[bodyIndex + offset]);
+#elif DIM == 2
+                    printf("ATTENTION for index: %i (%f, %f) %f\n", bodyIndex + offset,
+                           particles->x[bodyIndex + offset],
+                           particles->y[bodyIndex + offset],
+                           particles->mass[bodyIndex + offset]);
+#else
+                    printf("ATTENTION for index: %i (%e, %e, %e) %e sml = %e\n", bodyIndex + offset,
+                               particles->x[bodyIndex + offset],
+                               particles->y[bodyIndex + offset],
+                               particles->z[bodyIndex + offset],
+                               particles->mass[bodyIndex + offset],
+                               particles->sml[bodyIndex + offset]);
+#endif
+                    assert(0);
+                }
+                offset += stride;
+            }
+        }
+
+        __global__ void check4outOfBounds(Particles *particles, integer n){
+            int bodyIndex = threadIdx.x + blockDim.x * blockIdx.x;
+            int stride = blockDim.x * gridDim.x;
+            int offset = 0;
+
+            while ((bodyIndex + offset) < n) {
+                int neighborCount = 0;
+
+                if (particles->noi[(bodyIndex + offset)] >= MAX_NUM_INTERACTIONS) {
+                    printf("Particle %d has %d neighbors, which exceeds MAX_NUM_INTERACTIONS (%d)!\n", (bodyIndex + offset), particles->noi[(bodyIndex + offset)], MAX_NUM_INTERACTIONS);
+                    assert(0);
+                }
+
+                for (int j = 0; j < particles->noi[(bodyIndex + offset)]; ++j) {
+                    int neighbor = particles->nnl[(bodyIndex + offset) * MAX_NUM_INTERACTIONS + j];
+                    if (neighbor == -1) break;
+                    ++neighborCount;
+
+                    if (neighbor == (bodyIndex + offset)) {
+                        printf("Particle %d appears in its own neighbor list!\n", (bodyIndex + offset));
+                        assert(0);
+                    }
+                }
+                offset += stride;
+            }
+        }
+
         __global__ void check4nans(Particles *particles, integer n) {
             int bodyIndex = threadIdx.x + blockDim.x * blockIdx.x;
             int stride = blockDim.x * gridDim.x;
@@ -460,15 +517,16 @@ namespace ParticlesNS {
                     printf("level[%i] = %i!\n", bodyIndex + offset, particles->level[bodyIndex + offset]);
                     assert(0);
                 }
-                /*
+
                 if (std::isnan(particles->x[bodyIndex + offset]) || std::isnan(particles->mass[bodyIndex + offset])
-                    #if DIM > 1
+#if DIM > 1
                     || std::isnan(particles->y[bodyIndex + offset])
-                    #if DIM == 3
+#if DIM == 3
                     || std::isnan(particles->z[bodyIndex + offset])
 #endif
 #endif
                         ) {
+
 #if DIM == 1
                     printf("NAN for index: %i (%f) %f\n", bodyIndex + offset,
                            particles->x[bodyIndex + offset],
@@ -486,46 +544,60 @@ namespace ParticlesNS {
                            particles->mass[bodyIndex + offset]);
 #endif
                     assert(0);
-
-
                 }
 
-                if (particles->mass[bodyIndex + offset] == 0. || particles->sml[bodyIndex + offset] == 0.) {
-#if DIM == 1
-                    printf("ATTENTION for index: %i (%f) %f\n", bodyIndex + offset,
-                           particles->x[bodyIndex + offset],
-                           particles->mass[bodyIndex + offset]);
-#elif DIM == 2
-                    printf("ATTENTION for index: %i (%f, %f) %f\n", bodyIndex + offset,
-                           particles->x[bodyIndex + offset],
-                           particles->y[bodyIndex + offset],
-                           particles->mass[bodyIndex + offset]);
-#else
-                    printf("ATTENTION for index: %i (%e, %e, %e) %e sml = %e\n", bodyIndex + offset,
-                           particles->x[bodyIndex + offset],
-                           particles->y[bodyIndex + offset],
-                           particles->z[bodyIndex + offset],
-                           particles->mass[bodyIndex + offset],
-                           particles->sml[bodyIndex + offset]);
-#endif
-                    assert(0);
-                }
-
-                if (particles->x[bodyIndex + offset] > 1.e250
-                    #if DIM > 1
-                    || particles->y[bodyIndex + offset] > 1.e250
-                    #if DIM == 3
-                    || particles->z[bodyIndex + offset] > 1.e250
+                if (std::isnan(particles->ax[bodyIndex + offset])
+#if DIM > 1
+                    || std::isnan(particles->ay[bodyIndex + offset])
+#if DIM == 3
+                    || std::isnan(particles->az[bodyIndex + offset])
 #endif
 #endif
                         ) {
-                    printf("HUGE entry for index: %i (%e, %e, %e) %e\n", bodyIndex + offset,
-                           particles->x[bodyIndex + offset],
-                           particles->y[bodyIndex + offset],
-                           particles->z[bodyIndex + offset],
-                           particles->mass[bodyIndex + offset]);
+
+#if DIM == 1
+                    printf("NAN for index: a_%i (%f) \n", bodyIndex + offset,
+                           particles->ax[bodyIndex + offset]);
+#elif DIM == 2
+                    printf("NAN for index: a_%i (%f, %f) \n", bodyIndex + offset,
+                           particles->ax[bodyIndex + offset],
+                           particles->ay[bodyIndex + offset]);
+#else
+                    printf("NAN for index: a_%i (%f, %f, %f) \n", bodyIndex + offset,
+                           particles->ax[bodyIndex + offset],
+                           particles->ay[bodyIndex + offset],
+                           particles->az[bodyIndex + offset]);
+#endif
                     assert(0);
                 }
+
+                if (std::isnan(particles->p[bodyIndex + offset])){
+                    printf("NAN for index: p_%i %f [Pa] %f\n", bodyIndex + offset,
+                           particles->p[bodyIndex + offset]);
+                }
+
+                if (std::isnan(particles->rho[bodyIndex + offset])){
+                    printf("NAN for index: rho_%i %f [kg/m³] %f\n", bodyIndex + offset,
+                           particles->rho[bodyIndex + offset]);
+                }
+
+
+
+//                if (particles->x[bodyIndex + offset] > 1.e250
+//#if DIM > 1
+//                    || particles->y[bodyIndex + offset] > 1.e250
+//#if DIM == 3
+//                    || particles->z[bodyIndex + offset] > 1.e250
+//#endif
+//#endif
+//                        ) {
+//                    printf("HUGE entry for index: %i (%e, %e, %e) %e\n", bodyIndex + offset,
+//                           particles->x[bodyIndex + offset],
+//                           particles->y[bodyIndex + offset],
+//                           particles->z[bodyIndex + offset],
+//                           particles->mass[bodyIndex + offset]);
+//                    assert(0);
+//                }
 
                 //if (bodyIndex + offset == 128121) {
                 //    printf("INFO for index: %i (%e, %e, %e) %e sml = %e\n", bodyIndex + offset,
@@ -540,7 +612,7 @@ namespace ParticlesNS {
                 //    printf("sml = %e\n", particles->sml[bodyIndex + offset]);
                 //    assert(0);
                 //}
-                */
+
                 offset += stride;
             }
         }
@@ -578,6 +650,16 @@ namespace ParticlesNS {
             }
 #endif
 
+        }
+
+        real Launch::check4zeros(Particles *particles, integer n) {
+            ExecutionPolicy executionPolicy;
+            return cuda::launch(true, executionPolicy, ::ParticlesNS::Kernel::check4zeros, particles, n);
+        }
+
+        real Launch::check4outOfBounds(Particles *particles, integer n) {
+            ExecutionPolicy executionPolicy;
+            return cuda::launch(true, executionPolicy, ::ParticlesNS::Kernel::check4outOfBounds, particles, n);
         }
 
         real Launch::check4nans(Particles *particles, integer n) {
