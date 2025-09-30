@@ -21,7 +21,7 @@ MATERIALS = {
 
 CUBE_LENGTH = 5.0e-2           # half edge length of cube (m)
 IMPACT_RADIUS = 0.5 * 6.35e-3  # sphere radius (m)
-IMPACT_SPEED = -5.9e-3         # initial speed of impactor (m/s)
+IMPACT_SPEED = -5.9e-2         # initial speed of impactor (m/s)
 # IMPACT_SPEED = -5.9e-2          # initial speed of impactor (m/s)
 # impact_speed = -7e3  # m/s
 
@@ -173,6 +173,7 @@ def plot_2d_projection(x, y, rho, axis_labels, title, filename, output_dir, cmap
     fig.tight_layout()
     plt.savefig(os.path.join(output_dir, filename))
     plt.close(fig)
+
 def plot_2d_slice(x_proj, y_proj, rho_proj, axis_labels, title, filename, output_dir, cmap="viridis", dpi=150):
     """
     Erzeugt einen 2D-Scatter-Plot eines Slices (bzw. beliebiger 2D-Daten).
@@ -471,11 +472,14 @@ def main(dim, verbose, outDir, delta, dry):
     name = "al"
     basename = (
         f"{date_str}_{name}"
-        f"_NT{len(target_particles)}_VT{target_speed_str}"
-        f"_MT{material_id_target}"
-        f"_NI{len(impactor_particles)}_VI{impact_speed_str}"
-        f"_MI{material_id_impact}"
+        f"_N{len(total_particles)}"
+        f"_SML{smoothing_length:.2e}"
         f"_D{dim}"
+        f"_V{impact_speed:.2e}"
+        # f"_NT{len(target_particles)}_VT{target_speed_str}"
+        # f"_MT{material_id_target}"
+        # f"_NI{len(impactor_particles)}_VI{impact_speed_str}"
+        # f"_MI{material_id_impact}"
     )
     if not dry:
         plt.savefig(os.path.join(outDir,f"{basename}.png"), dpi=300)
@@ -527,7 +531,7 @@ def main(dim, verbose, outDir, delta, dry):
 
         logging.info("Saving files as:")
         logging.info(f"  HDF5: {basename}.h5")
-        logging.info(f"  Plots: {basename}_*.png")
+        logging.info(f"  Plots: {basename}.png")
 
         # === SPH Smoothing Length Vorschlag ===
         eta = 1.3  # Sicherheitsfaktor eta ∈ [1.2, 2.0]

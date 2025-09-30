@@ -1,15 +1,15 @@
 #ifndef MILUPHPC_PARAMETER_H
 #define MILUPHPC_PARAMETER_H
 
+// =======================================================
+// Debugging and Logging
+// =======================================================
 #define DEBUGGING 1
-#define LOGCOLOR 1
+#define LOGCOLOR 0
 
-// ------------------------------------
-// Parameter definitions
-// ------------------------------------
-#define MAX_LEVEL 21
-//#define theta 0.5
-
+// =======================================================
+// Safety Configuration
+// =======================================================
 /**
  * * `SAFETY_LEVEL 0`: almost no safety measures
  * * `SAFETY_LEVEL 1`: most relevant/important safety measures
@@ -18,46 +18,41 @@
  */
 #define SAFETY_LEVEL 1
 
-/// Dimension of the problem
+// =======================================================
+// Problem Dimensionality and Geometry
+// =======================================================
 #define DIM 2
 #define power_two(x) (1 << (x))
 #define POW_DIM power_two(DIM)
 
-/// [0]: natural units, [1]: SI units
-#define SI_UNITS 0
-
 /// [0]: rectangular (and not necessarily cubic domains), [1]: cubic domains
 #define CUBIC_DOMAINS 1
 
+// =======================================================
+// Units
+// =======================================================
+/// [0]: natural units, [1]: SI units
+#define SI_UNITS 0
+
+// =======================================================
+// Simulation Types and Physical Effects
+// =======================================================
 /// Simulation with gravitational forces
 #define GRAVITY_SIM 0
 
 /// SPH simulation
 #define SPH_SIM 1
 
-/// integrate energy equation
-#define INTEGRATE_ENERGY 0
+#define SOLID 1 //1
+#define NAVIER_STOKES 0
+#define POROSITY 0
+#define PALPHA_POROSITY 0
+#define FRAGMENTATION 0
+#define PLASTICITY 1
 
-/// integrate density equation
-#define INTEGRATE_DENSITY 1
-
-/// integrate smoothing length
-#define INTEGRATE_SML 0
-
-/// decouple smoothing length for pc integrator(s)
-#define DECOUPLE_SML 0
-
-/// variable smoothing length
-#define VARIABLE_SML 0
-
-/// correct smoothing length
-#define SML_CORRECTION 0
-
-// Available plastic flow conditions:
-// (if you do not know what this is, choose (1) or nothing)
-//   (1) Simple von Mises plasticity with a constant yield strength:
-#define VON_MISES_PLASTICITY 0
-
+// =======================================================
+// SPH Equation Version
+// =======================================================
 /**
  * Choose the SPH representation to solve the momentum and energy equation:
  * * **SPH_EQU_VERSION 1:** original version with
@@ -69,37 +64,56 @@
  */
 #define SPH_EQU_VERSION 1
 
+// =======================================================
+// Time Integration Options
+// =======================================================
+#define INTEGRATE_ENERGY 0
+#define INTEGRATE_DENSITY 0 //1
+#define INTEGRATE_SML 0
+#define DECOUPLE_SML 0
+#define VARIABLE_SML 0
+#define SML_CORRECTION 0
+
+// =======================================================
+// Viscosity and Stability
+// =======================================================
 // deprecated flag
 #define ARTIFICIAL_VISCOSITY 1
 #define BALSARA_SWITCH 0
-
-// to be (fully) implemented flags
-#define AVERAGE_KERNELS 0
-#define DEAL_WITH_TOO_MANY_INTERACTIONS 0
-#define SHEPARD_CORRECTION 0
-#define SOLID 1
-#define NAVIER_STOKES 0
-#define ARTIFICIAL_STRESS 1
-#define POROSITY 0
-#define ZERO_CONSISTENCY 0
-#define LINEAR_CONSISTENCY 0
-#define FRAGMENTATION 0
-#define PALPHA_POROSITY 0
-#define PLASTICITY 1
 #define KLEY_VISCOSITY 0
-
-#define KEY_MAX ULONG_MAX
-//TODO: make domain list size to run time constant
-#define DOMAIN_LIST_SIZE 512
-#define MAX_DEPTH 128
-#define MAX_NUM_INTERACTIONS 180
-#define NUM_THREADS_LIMIT_TIME_STEP 256
-#define NUM_THREADS_CALC_CENTER_OF_MASS 256
+#define ARTIFICIAL_STRESS 0 //1
 
 // Courant (CFL) number (note that our sml is defined up to the zero of the kernel, not half of it)
 #define COURANT_FACT 0.4
 
 #define FORCES_FACT 0.2
+
+// =======================================================
+// Advanced SPH Features (incomplete or experimental)
+// =======================================================
+#define AVERAGE_KERNELS 0
+#define DEAL_WITH_TOO_MANY_INTERACTIONS 0
+#define SHEPARD_CORRECTION 0
+#define ZERO_CONSISTENCY 0
+#define LINEAR_CONSISTENCY 0
+
+// =======================================================
+// Simulation Limits and Threading
+// =======================================================
+#define MAX_LEVEL 21
+
+// TODO: make domain list size to run time constant
+#define DOMAIN_LIST_SIZE 512
+#define MAX_DEPTH 128
+#define MAX_NUM_INTERACTIONS 180
+
+#define NUM_THREADS_LIMIT_TIME_STEP 256
+#define NUM_THREADS_CALC_CENTER_OF_MASS 256
+
+#define KEY_MAX ULONG_MAX
+
+#endif // MILUPHPC_PARAMETER_H
+
 
 //#define SOLID
 // ideal hydro, navier stokes
@@ -283,5 +297,3 @@
 #define OUTPUT_GRAV_ENERGY 0    // compute and output gravitational energy (at times when output files are written); of all SPH particles (and also w.r.t. gravitating point masses and between them); direct particle-particle summation, not tree; option exists to control costly computation for high particle numbers
 #define BINARY_INFO 0   // generates additional output file (binary_system.log) with info regarding binary system: semi-major axis, eccentricity if GRAVITATING_POINT_MASSES == 1
 */
-
-#endif //MILUPHPC_PARAMETER_H
