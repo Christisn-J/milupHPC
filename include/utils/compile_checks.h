@@ -25,6 +25,7 @@ template<typename T>
 T checkMinValue(T value, T min, T fallback, const std::string& name,
                 const std::string& source = "value", bool terminate = false)
 {
+    Logger(CHECK) << "Checking minimal value " << name;
     if (value < min) {
         Logger(WARN) << "Invalid " << name << " from " << source << ": " << value
                      << ". Resetting to: " << fallback;
@@ -35,6 +36,7 @@ T checkMinValue(T value, T min, T fallback, const std::string& name,
         }
         return fallback;
     }
+    Logger(CHECK) << "Parameter " << name << " checked, set at " << value;
     return value;
 }
 
@@ -45,6 +47,7 @@ template<typename T>
 T checkMaxValue(T value, T max, T fallback, const std::string& name,
                 const std::string& source = "value", bool terminate = false)
 {
+    Logger(CHECK) << "Checking maximal value " << name;
     if (value > max) {
         Logger(WARN) << "Invalid " << name << " from " << source << ": " << value
                      << " exceeds maximum " << max << ". Resetting to: " << fallback;
@@ -55,6 +58,7 @@ T checkMaxValue(T value, T max, T fallback, const std::string& name,
         }
         return fallback;
     }
+    Logger(CHECK) << "Parameter " << name << " checked, set at " << value;
     return value;
 }
 
@@ -65,6 +69,7 @@ template<typename T>
 T checkInRange(T value, T min, T max, T fallback, const std::string& name,
                const std::string& source = "value", bool terminate = false)
 {
+    Logger(CHECK) << "Checking in range " << name;
     if (value < min || value > max) {
         Logger(WARN) << "Invalid " << name << " from " << source << ": " << value
                      << " not in range [" << min << ", " << max << "]. Resetting to: " << fallback;
@@ -75,6 +80,7 @@ T checkInRange(T value, T min, T max, T fallback, const std::string& name,
         }
         return fallback;
     }
+    Logger(CHECK) << "Parameter " << name << " checked, set at " << value;
     return value;
 }
 
@@ -82,7 +88,7 @@ bool checkBoolValue(ConfigParser& conf, const std::string& key, bool fallback, c
 {
     try {
         bool value = conf.getVal<bool>(key);
-        Logger(INFO) << "Using parameter '" << key << "' from " << source << ": " << std::boolalpha << value;
+        Logger(CHECK) << "Using parameter '" << key << "' from " << source << ": " << std::boolalpha << value;
         return value;
     } catch (const std::exception& e) {
         Logger(WARN) << "Parameter '" << key << "' missing in " << source << ", using fallback: " << std::boolalpha << fallback;
@@ -94,7 +100,7 @@ bool checkBoolValue(const cxxopts::ParseResult& result, const std::string& key, 
 {
     if (result.count(key)) {
         bool value = result[key].as<bool>();
-        Logger(INFO) << "Using CLI parameter '" << key << "': " << std::boolalpha << value;
+        Logger(CHECK) << "Using CLI parameter '" << key << "': " << std::boolalpha << value;
         return value;
     } else {
         Logger(WARN) << "CLI parameter '" << key << "' not set, using fallback: " << std::boolalpha << fallback;
