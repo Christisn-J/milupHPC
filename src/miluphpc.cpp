@@ -446,15 +446,16 @@ real Miluphpc::rhs(int step, bool selfGravity, bool assignParticlesToProcess) {
     profiler.value2file(ProfilerIds::Time::boundingBox, *profilerTime);
 
 #if DEBUGGING
-    Logger(INFO) << "checking for nans before assigning particles...";
+    Logger(CHECK) << "checking for NANs before assigning particles...";
     ParticlesNS::Kernel::Launch::check4nans(particleHandler->d_particles, numParticlesLocal);
+    cudaDeviceSynchronize();
 #endif
 
-//#if DEBUGGING
+#if DEBUGGING
     Logger(INFO) << "before: numParticlesLocal: " << numParticlesLocal;
     Logger(INFO) << "before: numParticles:      " << numParticles;
     Logger(INFO) << "before: numNodes:          " << numNodes;
-//#endif
+#endif
 
     if (assignParticlesToProcess) {
         timer.reset();
@@ -745,45 +746,6 @@ real Miluphpc::reset() {
     cuda::set(particleHandler->d_nnl, -1, MAX_NUM_INTERACTIONS * numParticles);
 #endif
 
-#if SPH_SIM && DEBUGGING
-    Logger(DEBUG) << "initialization nnl";
-    particleHandler->copyNNL(To::host);
-
-    bool firstNonSelfLogged = false;
-
-    for (int i = 0; i < numParticlesLocal; ++i) {
-        int neighborCount = 0;
-        bool selfInNeighbors = false;
-
-        for (int j = 0; j < MAX_NUM_INTERACTIONS; ++j) {
-            int n = particleHandler->h_nnl[i * MAX_NUM_INTERACTIONS + j];
-            if (n == -1) break;
-            ++neighborCount;
-            if (n == i) selfInNeighbors = true;
-        }
-
-        if ((!selfInNeighbors && !firstNonSelfLogged)) {
-            Logger(DEBUG) << "Particle " << i << " has " << neighborCount << " neighbors and does not appear in its own neighbor list!";
-        }
-
-        // Nur beim ersten Partikel ohne Selbst-Nachbarschaft aktivieren
-        if (!selfInNeighbors && !firstNonSelfLogged) {
-            firstNonSelfLogged = true;
-        }
-
-        if (selfInNeighbors) {
-            std::stringstream ss;
-            ss << "Particle " << i << " has " << neighborCount << " neighbors and appear in its own neighbor list. Full neighbor list: \n";
-            for (int j = 0; j < MAX_NUM_INTERACTIONS; ++j) {
-                int n = particleHandler->h_nnl[i * MAX_NUM_INTERACTIONS + j];
-                if (n == -1) break;
-                ss << n << " ";
-            }
-            Logger(DEBUG) << ss.str();
-        }
-    }
-#endif
-
     //Logger(TIME) << "resetArrays: " << time << " ms";
     // END: resetting arrays, variables, buffers, ...
     return time;
@@ -1033,7 +995,7 @@ real Miluphpc::assignParticles() {
                            << " numParticles = " << numParticles;
         // TODO: implement possibility to restart simulation
         Logger(ERROR) << "Restart simulation with more memory! exiting ...";
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     delete [] sendLengths;
@@ -1195,6 +1157,12 @@ real Miluphpc::parallel_tree() {
     all_reduce(comm, boost::mpi::inplace_t<integer*>(&numParticlesSum), 1, std::plus<integer>());
     Logger(INFO) << "numParticlesSum: " << numParticlesSum;
     //ParticlesNS::Kernel::Launch::info(particleHandler->d_particles, numParticlesLocal, numParticles, treeIndex);
+#endif
+
+#if DEBUGGING
+    Logger(CHECK) << "checking for NANs before building tree...";
+    ParticlesNS::Kernel::Launch::check4nans(particleHandler->d_particles, numParticlesLocal);
+    cudaDeviceSynchronize();
 #endif
 
     Logger(DEBUG) << "building domain tree ...";
@@ -1785,7 +1753,7 @@ real Miluphpc::parallel_gravity() {
     else {
         MPI_Finalize();
         Logger(ERROR) << "symbolicForceVersion: " << symbolicForceVersion << " not available!";
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
 
@@ -2058,7 +2026,7 @@ real Miluphpc::parallel_gravity() {
         MPI_Finalize();
         Logger(ERROR) << "numParticlesLocal + receiveLength = " << treeHandler->h_toDeleteLeaf[1] << " > " << " numParticles = " << numParticles;
         Logger(ERROR) << "Restart simulation with more memory! exiting ...";
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     //int debugOffset = 0;
@@ -2107,7 +2075,7 @@ real Miluphpc::parallel_gravity() {
         Logger(ERROR) << "needed numNodes = " << treeHandler->h_toDeleteNode[1] << " > "
                            << " numNodes = " << numNodes;
         Logger(ERROR) << "Restart simulation with more memory! exiting ...";
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     cuda::copy(treeHandler->h_toDeleteNode, treeHandler->d_toDeleteNode, 2, To::device);
@@ -2658,7 +2626,7 @@ real Miluphpc::parallel_sph() {
         Logger(ERROR) << "numParticlesLocal + receiveLength = " << treeHandler->h_toDeleteLeaf[1] << " > "
                             << " numParticles = " << numParticles;
         Logger(ERROR) << "Restart simulation with more memory! exiting ...";
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     // x-entry particle exchange
@@ -2859,7 +2827,7 @@ real Miluphpc::parallel_sph() {
         MPI_Finalize();
         Logger(ERROR) << "needed numNodes = " << treeHandler->h_toDeleteNode[1] << " > " << " numNodes = " << numNodes;
         Logger(ERROR) << "Restart simulation with more memory! exiting ...";
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     treeHandler->copy(To::host);
@@ -2966,46 +2934,13 @@ real Miluphpc::parallel_sph() {
     else {
         Logger(ERROR) << "fixedRadiusNN version not available! Exiting ...";
         MPI_Finalize();
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
-#if SPH_SIM && DEBUGGING
-    Logger(DEBUG) << "fixedRadiusNN nnl";
-    particleHandler->copyNNL(To::host);
-
-    bool firstNonSelfLogged = false;
-
-    for (int i = 0; i < numParticlesLocal; ++i) {
-        int neighborCount = 0;
-        bool selfInNeighbors = false;
-
-        for (int j = 0; j < MAX_NUM_INTERACTIONS; ++j) {
-            int n = particleHandler->h_nnl[i * MAX_NUM_INTERACTIONS + j];
-            if (n == -1) break;
-            ++neighborCount;
-            if (n == i) selfInNeighbors = true;
-        }
-
-        if ((!selfInNeighbors && !firstNonSelfLogged)) {
-            Logger(DEBUG) << "Particle " << i << " has " << neighborCount << " neighbors and does not appear in its own neighbor list!";
-        }
-
-        // Nur beim ersten Partikel ohne Selbst-Nachbarschaft aktivieren
-        if (!selfInNeighbors && !firstNonSelfLogged) {
-            firstNonSelfLogged = true;
-        }
-
-        if (selfInNeighbors) {
-            std::stringstream ss;
-            ss << "Particle " << i << " has " << neighborCount << " neighbors and appear in its own neighbor list. Full neighbor list: \n";
-            for (int j = 0; j < MAX_NUM_INTERACTIONS; ++j) {
-                int n = particleHandler->h_nnl[i * MAX_NUM_INTERACTIONS + j];
-                if (n == -1) break;
-                ss << n << " ";
-            }
-            Logger(DEBUG) << ss.str();
-        }
-    }
+#if DEBUGGING
+    Logger(CHECK) << "selfinteraction via nnl";
+    ParticlesNS::Kernel::Launch::check4outOfBounds(particleHandler->d_particles, numParticlesLocal);
+    cudaDeviceSynchronize();
 #endif
 
     profiler.value2file(ProfilerIds::Time::SPH::fixedRadiusNN, time);
@@ -3091,43 +3026,18 @@ real Miluphpc::parallel_sph() {
     totalTime += time;
 
     Logger(DEBUG) << "internal forces";
-#if SPH_SIM && DEBUGGING
-    Logger(DEBUG) << "internal forces nnl";
-    particleHandler->copyNNL(To::host);
 
-    firstNonSelfLogged = false;
+#if DEBUGGING
+    Logger(CHECK) << "checking selfinteraction via nnl";
+    ParticlesNS::Kernel::Launch::check4outOfBounds(particleHandler->d_particles, numParticlesLocal);
+	cudaDeviceSynchronize();
+#endif
 
-    for (int i = 0; i < numParticlesLocal; ++i) {
-        int neighborCount = 0;
-        bool selfInNeighbors = false;
 
-        for (int j = 0; j < MAX_NUM_INTERACTIONS; ++j) {
-            int n = particleHandler->h_nnl[i * MAX_NUM_INTERACTIONS + j];
-            if (n == -1) break;
-            ++neighborCount;
-            if (n == i) selfInNeighbors = true;
-        }
-
-        if ((!selfInNeighbors && !firstNonSelfLogged)) {
-            Logger(DEBUG) << "Particle " << i << " has " << neighborCount << " neighbors and does not appear in its own neighbor list!";
-        }
-
-        // Nur beim ersten Partikel ohne Selbst-Nachbarschaft aktivieren
-        if (!selfInNeighbors && !firstNonSelfLogged) {
-            firstNonSelfLogged = true;
-        }
-
-        if (selfInNeighbors) {
-            std::stringstream ss;
-            ss << "Particle " << i << " has " << neighborCount << " neighbors and appear in its own neighbor list. Full neighbor list: \n";
-            for (int j = 0; j < MAX_NUM_INTERACTIONS; ++j) {
-                int n = particleHandler->h_nnl[i * MAX_NUM_INTERACTIONS + j];
-                if (n == -1) break;
-                ss << n << " ";
-            }
-            Logger(DEBUG) << ss.str();
-        }
-    }
+#if DEBUGGING
+    Logger(CHECK) << "checking for NANs before internalForces...";
+    ParticlesNS::Kernel::Launch::check4nans(particleHandler->d_particles, numParticlesLocal);
+    cudaDeviceSynchronize();
 #endif
 
     time = SPH::Kernel::Launch::internalForces(kernelHandler.kernel, materialHandler->d_materials, treeHandler->d_tree,
@@ -3628,9 +3538,10 @@ real Miluphpc::particles2file(int step) {
 
     HighFive::DataSet pos = h5file.createDataSet<real>("/x", HighFive::DataSpace(dataSpaceDims));
     HighFive::DataSet vel = h5file.createDataSet<real>("/v", HighFive::DataSpace(dataSpaceDims));
+	HighFive::DataSet acc = h5file.createDataSet<real>("/a", HighFive::DataSpace(dataSpaceDims));
     HighFive::DataSet key = h5file.createDataSet<keyType>("/key", HighFive::DataSpace(sumParticles));
     HighFive::DataSet h5_mass = h5file.createDataSet<real>("/m", HighFive::DataSpace(sumParticles));
-    HighFive::DataSet h5_proc = h5file.createDataSet<int>("/proc", HighFive::DataSpace(sumParticles));
+    HighFive::DataSet h5_proc = h5file.createDataSet<integer>("/proc", HighFive::DataSpace(sumParticles));
 #if SPH_SIM
     HighFive::DataSet h5_rho = h5file.createDataSet<real>("/rho", HighFive::DataSpace(sumParticles));
     HighFive::DataSet h5_p = h5file.createDataSet<real>("/p", HighFive::DataSpace(sumParticles));
@@ -3681,7 +3592,7 @@ real Miluphpc::particles2file(int step) {
     Logger(INFO) << "creating datasets ...";
     // ----------
 
-    std::vector<std::vector<real>> x, v; // two dimensional vector for 3D vector data
+    std::vector<std::vector<real>> x, v, a; // two dimensional vector for 3D vector data
     std::vector<keyType> k; // one dimensional vector holding particle keys
     std::vector<real> mass;
     std::vector<int> particleProc;
@@ -3748,17 +3659,20 @@ real Miluphpc::particles2file(int step) {
 #if DIM == 1
         x.push_back({particleHandler->h_x[i]});
         v.push_back({particleHandler->h_vx[i]});
+		a.push_back({particleHandler->h_ax[i]});
 #elif DIM == 2
         x.push_back({particleHandler->h_x[i], particleHandler->h_y[i]});
         v.push_back({particleHandler->h_vx[i], particleHandler->h_vy[i]});
+		a.push_back({particleHandler->h_ax[i], particleHandler->h_ay[i]});
 #else
         x.push_back({particleHandler->h_x[i], particleHandler->h_y[i], particleHandler->h_z[i]});
         v.push_back({particleHandler->h_vx[i], particleHandler->h_vy[i], particleHandler->h_vz[i]});
+		a.push_back({particleHandler->h_ax[i], particleHandler->h_ay[i], particleHandler->h_az[i]});
 #endif
         k.push_back(h_keys[i]);
         mass.push_back(particleHandler->h_mass[i]);
         particleProc.push_back(subDomainKeyTreeHandler->h_subDomainKeyTree->rank);
-        //Logger(INFO) << "mass[" << i << "] = " << mass[i];
+
 #if SPH_SIM
         rho.push_back(particleHandler->h_rho[i]);
         p.push_back(particleHandler->h_p[i]);
@@ -3825,6 +3739,8 @@ real Miluphpc::particles2file(int step) {
                 {std::size_t(numParticlesLocal), std::size_t(DIM)}).write(x);
     vel.select({nOffset, 0},
                 {std::size_t(numParticlesLocal), std::size_t(DIM)}).write(v);
+	acc.select({nOffset, 0},
+                {std::size_t(numParticlesLocal), std::size_t(DIM)}).write(a);
     key.select({nOffset}, {std::size_t(numParticlesLocal)}).write(k);
     h5_mass.select({nOffset}, {std::size_t(numParticlesLocal)}).write(mass);
     h5_proc.select({nOffset}, {std::size_t(numParticlesLocal)}).write(particleProc);
