@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 'created by Anne Vera Jeschke 10th February 2023'
 import numpy as np
 import matplotlib.pyplot as plt

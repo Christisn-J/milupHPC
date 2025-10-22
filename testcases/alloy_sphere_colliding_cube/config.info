@@ -25,11 +25,12 @@ particlesSent2H5 false
 ; explicit euler [0], predictor-corrector euler [1]
 integrator 1
 ; initial time step
-timeStep 0.05
+timeStep 1e-6
 ; max time step allowed
-maxTimeStep 10e-1
+maxTimeStep 1e-1
 ; end time for simulation
-timeEnd 240.0
+; 1.0169
+timeEnd 0.50845
 
 ; SIMULATION RELATED
 ; ------------------------------------------------------

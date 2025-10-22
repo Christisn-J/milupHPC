@@ -43,7 +43,7 @@
 /// SPH simulation
 #define SPH_SIM 1
 
-#define SOLID 1 //1
+#define SOLID 1
 #define NAVIER_STOKES 0
 #define POROSITY 0
 #define PALPHA_POROSITY 0
@@ -67,8 +67,8 @@
 // =======================================================
 // Time Integration Options
 // =======================================================
-#define INTEGRATE_ENERGY 0
-#define INTEGRATE_DENSITY 0 //1
+#define INTEGRATE_ENERGY 1
+#define INTEGRATE_DENSITY 1
 #define INTEGRATE_SML 0
 #define DECOUPLE_SML 0
 #define VARIABLE_SML 0
@@ -79,13 +79,12 @@
 // =======================================================
 // deprecated flag
 #define ARTIFICIAL_VISCOSITY 1
+#define ARTIFICIAL_STRESS 0
 #define BALSARA_SWITCH 0
 #define KLEY_VISCOSITY 0
-#define ARTIFICIAL_STRESS 0 //1
 
 // Courant (CFL) number (note that our sml is defined up to the zero of the kernel, not half of it)
 #define COURANT_FACT 0.4
-
 #define FORCES_FACT 0.2
 
 // =======================================================
