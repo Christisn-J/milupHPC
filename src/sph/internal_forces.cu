@@ -330,12 +330,12 @@ __global__ void SPH::Kernel::internalForces(::SPH::SPH_kernel kernel, Material *
 
 #if SOLID
 
-//#if PLASTICITY
-//            // add plasticity to S of i
-//            SPH::applyPlasticity(materials, matIdi, particles, i);
-//            // add plasticity to S of j
-//            SPH::applyPlasticity(materials, matIdj, particles, j);
-//#endif
+#if PLASTICITY
+            // add plasticity to S of i
+            SPH::applyPlasticity(materials, matId, particles, i);
+            // add plasticity to S of j
+            SPH::applyPlasticity(materials, particles->materialId[j], particles, j);
+#endif
             // get sigma_i
             SPH::calcStress(particles, sigma_i, i);
             // get sigma_j

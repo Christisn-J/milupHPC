@@ -19,7 +19,7 @@ namespace EOS {
                               (pow(particles->rho[index] / materials[particles->materialId[index]].eos.rho_0, materials[particles->materialId[index]].eos.n) - 1.0);
     }
 
-/*    __device__ void tillotson(Material *materials, Particles *particles, int index,
+    __device__ void tillotson(Material *materials, Particles *particles, int index,
                               double rho, double e, double &eta, double &mu, double &p1, double &p2) {
         // 	Translation Matrix
         //  rho = particles->rho[index];
@@ -31,44 +31,41 @@ namespace EOS {
         eta = rho / materials[matId].eos.rho_0;
         mu = eta - 1.0;
 
-        double omega0 = e / (materials[matId].eos.E_0 * eta * eta) + 1.0;
+        double omega0 = e / (materials[matId].eos.E_0 * pow(eta, 2.0)) + 1.0;
 
         // Check if the energy is within the compressed region (e <= E_iv)
         if (e <= materials[matId].eos.E_iv) {
             particles->p[index] =
                     (materials[matId].eos.till_a
                      + materials[matId].eos.till_b / omega0)
-                    * eta * e
-                    + materials[matId].eos.till_A * eta
-                    + materials[matId].eos.till_B * eta * eta;
+                    * rho * e
+                    + materials[matId].eos.till_A * mu
+                    + materials[matId].eos.till_B * pow(mu, 2.0);
         }
             // Check if the energy is within the expanded region (e >= E_cv)
         else if (e >= materials[matId].eos.E_cv) {
             particles->p[index] =
-                    (materials[matId].eos.till_a
-                     + materials[matId].eos.till_b / omega0)
-                    * eta * e
-                    + materials[matId].eos.till_A * eta
-                      * exp(-materials[matId].eos.till_beta * ((materials[matId].eos.rho_0 / rho) - 1.0))
-                      * exp(-materials[matId].eos.till_alpha * pow(((materials[matId].eos.rho_0 / rho) - 1.0), 2.0));
+                    materials[matId].eos.till_a * rho * e
+                    +((materials[matId].eos.till_b * rho * e/ omega0)
+                      + materials[matId].eos.till_A * mu  * exp(-materials[matId].eos.till_beta * ((materials[matId].eos.rho_0 / rho) - 1.0)))
+                     * exp(-materials[matId].eos.till_alpha * pow(((materials[matId].eos.rho_0 / rho) - 1.0), 2.0));
+
         }
             // Partial vaporization region (E_iv < e < E_cv)
-        else {
+        else if (e > materials[matId].eos.E_iv && e < materials[matId].eos.E_cv){
             double weight = (e - materials[matId].eos.E_iv) /
                             (materials[matId].eos.E_cv - materials[matId].eos.E_iv);
 
             p1 = (materials[matId].eos.till_a
                   + materials[matId].eos.till_b / omega0)
-                 * eta * e
-                 + materials[matId].eos.till_A * eta
-                 + materials[matId].eos.till_B * eta * eta;
+                 * rho * e
+                 + materials[matId].eos.till_A * mu
+                 + materials[matId].eos.till_B * pow(mu, 2.0);
 
-            p2 = (materials[matId].eos.till_a
-                  + materials[matId].eos.till_b / omega0)
-                 * eta * e
-                 + materials[matId].eos.till_A * eta
-                   * exp(-materials[matId].eos.till_beta * ((materials[matId].eos.rho_0 / rho) - 1.0))
-                   * exp(-materials[matId].eos.till_alpha * pow(((materials[matId].eos.rho_0 / rho) - 1.0), 2.0));
+            p2 = materials[matId].eos.till_a * rho * e
+                 +((materials[matId].eos.till_b * rho * e/ omega0)
+                   + materials[matId].eos.till_A * mu  * exp(-materials[matId].eos.till_beta * ((materials[matId].eos.rho_0 / rho) - 1.0)))
+                  * exp(-materials[matId].eos.till_alpha * pow(((materials[matId].eos.rho_0 / rho) - 1.0), 2.0));
 
             particles->p[index] = (1.0 - weight) * p1 + weight * p2;
         }
@@ -76,9 +73,15 @@ namespace EOS {
             printf("\n\nDeep trouble in pressure.\nenergy[%d] = %e\nE_iv = %e, E_cv = %e\n\n", index, e, materials[matId].eos.E_iv, materials[matId].eos.E_cv);
             particles->p[index] = 0.0;
         }
-    }*/
 
-	__device__ void tillotson(Material *materials, Particles *particles, int index) {
+//#if DEBUGGING
+//    	if (particles->p[index] > 0 || 0 > particles->p[index]){
+//    		printf("\ni %d: p= %.17lf | mu = %.17lf / %.17lf -1 = %.17lf \n", index, particles->p[index], rho, materials[matId].eos.rho_0, mu);
+//    	};
+//#endif
+    }
+
+/*	__device__ void tillotson(Material *materials, Particles *particles, int index) {
 		// 	Translation Matrix
 		//  rho = particles->rho[index];
     	//  e = particles->e[index];
@@ -92,9 +95,10 @@ namespace EOS {
             	(materials[particles->materialId[index]].eos.till_a
 				+ materials[particles->materialId[index]].eos.till_b / (1 + particles->e[index] / (materials[particles->materialId[index]].eos.E_0 * pow((particles->rho[index] / materials[particles->materialId[index]].eos.rho_0), 2))))
             	* (particles->rho[index] / materials[particles->materialId[index]].eos.rho_0) * particles->e[index]
-            	+ materials[particles->materialId[index]].eos.till_A * (particles->rho[index] / materials[particles->materialId[index]].eos.rho_0)
+            	+ materials[particles->materialId[index]].eos.till_A * ((particles->rho[index] / materials[particles->materialId[index]].eos.rho_0) -1)
             	+ materials[particles->materialId[index]].eos.till_B * pow((particles->rho[index] / materials[particles->materialId[index]].eos.rho_0),2);
     		}
+
     	// Check if the energy is within the expanded region (e >= E_cv)
     	else if (particles->e[index] >= materials[particles->materialId[index]].eos.E_cv) {
         	// Expanded region EOS
@@ -138,7 +142,11 @@ namespace EOS {
     		printf("\n\nDeep trouble in pressure.\nenergy[%d] = %e\nE_iv = %e, E_cv = %e\n\n", index, particles->e[index], materials[particles->materialId[index]].eos.E_iv, materials[particles->materialId[index]].eos.E_cv);
         	particles->p[index] = 0.0;
        	}
-	}
+
+		if (particles->p[index] > 0 || 0 > particles->p[index]){
+			printf("\ni %d: p= %.17lf | rho= %.17lf / %.17lf  \n", index, particles->p[index], particles->rho[index], materials[particles->materialId[index]].eos.rho_0);
+		};
+	}*/
 
     __device__ void isothermalGas(Material *materials, Particles *particles, int index) {
         //printf("isothermalGas...\n");
@@ -189,10 +197,10 @@ namespace SPH {
                     }
                         break;
                     case EquationOfStates::EOS_TYPE_TILLOTSON: {
-                        ::EOS::tillotson(materials, particles, i);
-//                        rho = particles->rho[i];
-//                        e = particles->e[i];
-//                        ::EOS::tillotson(materials, particles, i, rho, e, eta, mu, p1, p2);
+//                        ::EOS::tillotson(materials, particles, i);
+                        rho = particles->rho[i];
+                        e = particles->e[i];
+                        ::EOS::tillotson(materials, particles, i, rho, e, eta, mu, p1, p2);
                     }
                         break;
                     case EquationOfStates::EOS_TYPE_ISOTHERMAL_GAS: {

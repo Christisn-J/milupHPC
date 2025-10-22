@@ -18,7 +18,7 @@
 #include "kernel.cuh"
 #include "stress.cuh"
 #include "artificial_stress.cuh"
-//#include "plasticity.cuh"
+#include "plasticity.cuh"
 
 namespace SPH {
     namespace Kernel {

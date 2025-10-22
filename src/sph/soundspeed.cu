@@ -67,124 +67,124 @@ __global__ void SPH::Kernel::calculateSoundSpeed(Particles *particles, Material 
                 //case EquationOfStates::EOS_TYPE_MURNAGHAN: {
                 //     // do nothing since c_s is constant
                 //} break;
+//            case EquationOfStates::EOS_TYPE_TILLOTSON: {
+//                // 	Translation Matrix
+//                // rho = particles->rho[i];
+//                // pressure = particles->p[i];
+//                // eta = rho / materials[matId].eos.rho_0;
+//                // mu = eta - 1.0;
+//                // omega0 = particles->e[i] / (materials[matId].eos.E_0 * eta * eta) + 1.0;
+//                // z = (1.0 - eta) / eta;
+//
+//                if ((particles->rho[i] / materials[matId].eos.rho_0) >= 0.0 || particles->e[i] < materials[matId].eos.E_iv) {
+//                    if (particles->p[i] < 0.0 || (particles->rho[i] / materials[matId].eos.rho_0) < materials[matId].eos.rho_limit) particles->p[i] = 0.0;
+//
+//                    cs_sq = materials[matId].eos.till_a * particles->e[i]
+//                            + (materials[matId].eos.till_b * particles->e[i]) /
+//                              ((particles->e[i] / (materials[matId].eos.E_0 * (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0)) + 1.0) *
+//                               (particles->e[i] / (materials[matId].eos.E_0 * (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0)) + 1.0)) *
+//                              (3.0 * (particles->e[i] / (materials[matId].eos.E_0 * (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0)) + 1.0) - 2.0)
+//                            + (materials[matId].eos.till_a + 2.0 * materials[matId].eos.till_b * ((particles->rho[i] / materials[matId].eos.rho_0) - 1.0)) / particles->rho[i]
+//                            + particles->p[i] / (particles->rho[i] * particles->rho[i]) * (materials[matId].eos.till_a * particles->rho[i] + materials[matId].eos.till_b * particles->rho[i] /
+//                                                                                                                                             ((particles->e[i] / (materials[matId].eos.E_0 *
+//                                                                                                                                                                  (particles->rho[i] /
+//                                                                                                                                                                   materials[matId].eos.rho_0) *
+//                                                                                                                                                                  (particles->rho[i] /
+//                                                                                                                                                                   materials[matId].eos.rho_0)) + 1.0) *
+//                                                                                                                                              (particles->e[i] / (materials[matId].eos.E_0 *
+//                                                                                                                                                                  (particles->rho[i] /
+//                                                                                                                                                                   materials[matId].eos.rho_0) *
+//                                                                                                                                                                  (particles->rho[i] /
+//                                                                                                                                                                   materials[matId].eos.rho_0)) +
+//                                                                                                                                               1.0)));
+//                } else if (particles->e[i] > materials[matId].eos.E_cv) {
+//                    Gamma_e = materials[matId].eos.till_a
+//                              + materials[matId].eos.till_b /
+//                                (particles->e[i] / (materials[matId].eos.E_0 * (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0)) + 1.0) *
+//                                exp(-materials[matId].eos.till_beta * ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)) *
+//                                    ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)));
+//
+//                    cs_sq = (Gamma_e + 1.0) * particles->p[i] / particles->rho[i]
+//                            + materials[matId].eos.till_a / particles->rho[i]
+//                              * exp(-(materials[matId].eos.till_alpha * ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)) +
+//                                      materials[matId].eos.till_beta * ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)) *
+//                                      ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0))))
+//                              * (1.0 + ((particles->rho[i] / materials[matId].eos.rho_0) - 1.0)) / ((particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0))
+//                              * (materials[matId].eos.till_alpha +
+//                                 2.0 * materials[matId].eos.till_beta * ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)) -
+//                                 (particles->rho[i] / materials[matId].eos.rho_0))
+//                            + materials[matId].eos.till_b * particles->rho[i] * particles->e[i]
+//                              / ((particles->e[i] / (materials[matId].eos.E_0 * (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0)) + 1.0) *
+//                                 (particles->e[i] / (materials[matId].eos.E_0 * (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0)) + 1.0) *
+//                                 (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0))
+//                              * exp(-materials[matId].eos.till_beta * ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)) *
+//                                    ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)))
+//                              * (2.0 * materials[matId].eos.till_beta * ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)) *
+//                                 (particles->e[i] / (materials[matId].eos.E_0 * (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0)) + 1.0) /
+//                                 materials[matId].eos.rho_0 + 1.0)
+//                              / (materials[matId].eos.E_0 * particles->rho[i])
+//                              * (2.0 * particles->e[i] - particles->p[i] / particles->rho[i]);
+//                } else {
+//                    Gamma_e = materials[matId].eos.till_a
+//                              + materials[matId].eos.till_b /
+//                                (particles->e[i] / (materials[matId].eos.E_0 * (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0)) + 1.0) *
+//                                exp(-materials[matId].eos.till_beta * ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)) *
+//                                    ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)));
+//
+//                    cs_e_sq = (Gamma_e + 1.0) * particles->p[i] / particles->rho[i]
+//                              + materials[matId].eos.till_a / particles->rho[i]
+//                                * exp(-(materials[matId].eos.till_alpha * ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)) +
+//                                        materials[matId].eos.till_beta * ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)) *
+//                                        ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0))))
+//                                * (1.0 + ((particles->rho[i] / materials[matId].eos.rho_0) - 1.0)) /
+//                                ((particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0))
+//                                * (materials[matId].eos.till_alpha +
+//                                   2.0 * materials[matId].eos.till_beta * ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)) -
+//                                   (particles->rho[i] / materials[matId].eos.rho_0))
+//                              + materials[matId].eos.till_b * particles->rho[i] * particles->e[i]
+//                                / ((particles->e[i] / (materials[matId].eos.E_0 * (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0)) + 1.0) *
+//                                   (particles->e[i] / (materials[matId].eos.E_0 * (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0)) + 1.0) *
+//                                   (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0))
+//                                * exp(-materials[matId].eos.till_beta * ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)) *
+//                                      ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)))
+//                                * (2.0 * materials[matId].eos.till_beta * ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)) *
+//                                   (particles->e[i] / (materials[matId].eos.E_0 * (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0)) + 1.0) /
+//                                   materials[matId].eos.rho_0 + 1.0)
+//                                / (materials[matId].eos.E_0 * particles->rho[i])
+//                                * (2.0 * particles->e[i] - particles->p[i] / particles->rho[i]);
+//
+//                    if (particles->p[i] < 0.0 || (particles->rho[i] / materials[matId].eos.rho_0) < materials[matId].eos.rho_limit) particles->p[i] = 0.0;
+//
+//                    cs_c_sq = materials[matId].eos.till_a * particles->e[i]
+//                              + (materials[matId].eos.till_b * particles->e[i]) /
+//                                ((particles->e[i] / (materials[matId].eos.E_0 * (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0)) + 1.0) *
+//                                 (particles->e[i] / (materials[matId].eos.E_0 * (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0)) + 1.0)) *
+//                                (3.0 * (particles->e[i] / (materials[matId].eos.E_0 * (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0)) + 1.0) - 2.0)
+//                              + (materials[matId].eos.till_a + 2.0 * materials[matId].eos.till_b * ((particles->rho[i] / materials[matId].eos.rho_0) - 1.0)) / particles->rho[i]
+//                              + particles->p[i] / (particles->rho[i] * particles->rho[i]) * (materials[matId].eos.till_a * particles->rho[i] + materials[matId].eos.till_b * particles->rho[i] /
+//                                                                                                                                               ((particles->e[i] / (materials[matId].eos.E_0 *
+//                                                                                                                                                                    (particles->rho[i] /
+//                                                                                                                                                                     materials[matId].eos.rho_0) *
+//                                                                                                                                                                    (particles->rho[i] /
+//                                                                                                                                                                     materials[matId].eos.rho_0)) +
+//                                                                                                                                                 1.0) * (particles->e[i] / (materials[matId].eos.E_0 *
+//                                                                                                                                                                            (particles->rho[i] /
+//                                                                                                                                                                             materials[matId].eos.rho_0) *
+//                                                                                                                                                                            (particles->rho[i] /
+//                                                                                                                                                                             materials[matId].eos.rho_0)) +
+//                                                                                                                                                         1.0)));
+//
+//                    y = (particles->e[i] - materials[matId].eos.E_iv) / (materials[matId].eos.E_cv - materials[matId].eos.E_iv);
+//                    cs_sq = cs_e_sq * (1.0 - y) + cs_c_sq * y;
+//                }
+//
+//                if (cs_sq < materials[matId].eos.cs_limit * materials[matId].eos.cs_limit) {
+//                    particles->cs[i] = materials[matId].eos.cs_limit;
+//                } else {
+//                    particles->cs[i] = sqrt(cs_sq);
+//                }
+//            }
             case EquationOfStates::EOS_TYPE_TILLOTSON: {
-                // 	Translation Matrix
-                // rho = particles->rho[i];
-                // pressure = particles->p[i];
-                // eta = rho / materials[matId].eos.rho_0;
-                // mu = eta - 1.0;
-                // omega0 = particles->e[i] / (materials[matId].eos.E_0 * eta * eta) + 1.0;
-                // z = (1.0 - eta) / eta;
-
-                if ((particles->rho[i] / materials[matId].eos.rho_0) >= 0.0 || particles->e[i] < materials[matId].eos.E_iv) {
-                    if (particles->p[i] < 0.0 || (particles->rho[i] / materials[matId].eos.rho_0) < materials[matId].eos.rho_limit) particles->p[i] = 0.0;
-
-                    cs_sq = materials[matId].eos.till_a * particles->e[i]
-                            + (materials[matId].eos.till_b * particles->e[i]) /
-                              ((particles->e[i] / (materials[matId].eos.E_0 * (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0)) + 1.0) *
-                               (particles->e[i] / (materials[matId].eos.E_0 * (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0)) + 1.0)) *
-                              (3.0 * (particles->e[i] / (materials[matId].eos.E_0 * (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0)) + 1.0) - 2.0)
-                            + (materials[matId].eos.till_a + 2.0 * materials[matId].eos.till_b * ((particles->rho[i] / materials[matId].eos.rho_0) - 1.0)) / particles->rho[i]
-                            + particles->p[i] / (particles->rho[i] * particles->rho[i]) * (materials[matId].eos.till_a * particles->rho[i] + materials[matId].eos.till_b * particles->rho[i] /
-                                                                                                                                             ((particles->e[i] / (materials[matId].eos.E_0 *
-                                                                                                                                                                  (particles->rho[i] /
-                                                                                                                                                                   materials[matId].eos.rho_0) *
-                                                                                                                                                                  (particles->rho[i] /
-                                                                                                                                                                   materials[matId].eos.rho_0)) + 1.0) *
-                                                                                                                                              (particles->e[i] / (materials[matId].eos.E_0 *
-                                                                                                                                                                  (particles->rho[i] /
-                                                                                                                                                                   materials[matId].eos.rho_0) *
-                                                                                                                                                                  (particles->rho[i] /
-                                                                                                                                                                   materials[matId].eos.rho_0)) +
-                                                                                                                                               1.0)));
-                } else if (particles->e[i] > materials[matId].eos.E_cv) {
-                    Gamma_e = materials[matId].eos.till_a
-                              + materials[matId].eos.till_b /
-                                (particles->e[i] / (materials[matId].eos.E_0 * (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0)) + 1.0) *
-                                exp(-materials[matId].eos.till_beta * ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)) *
-                                    ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)));
-
-                    cs_sq = (Gamma_e + 1.0) * particles->p[i] / particles->rho[i]
-                            + materials[matId].eos.till_a / particles->rho[i]
-                              * exp(-(materials[matId].eos.till_alpha * ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)) +
-                                      materials[matId].eos.till_beta * ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)) *
-                                      ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0))))
-                              * (1.0 + ((particles->rho[i] / materials[matId].eos.rho_0) - 1.0)) / ((particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0))
-                              * (materials[matId].eos.till_alpha +
-                                 2.0 * materials[matId].eos.till_beta * ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)) -
-                                 (particles->rho[i] / materials[matId].eos.rho_0))
-                            + materials[matId].eos.till_b * particles->rho[i] * particles->e[i]
-                              / ((particles->e[i] / (materials[matId].eos.E_0 * (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0)) + 1.0) *
-                                 (particles->e[i] / (materials[matId].eos.E_0 * (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0)) + 1.0) *
-                                 (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0))
-                              * exp(-materials[matId].eos.till_beta * ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)) *
-                                    ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)))
-                              * (2.0 * materials[matId].eos.till_beta * ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)) *
-                                 (particles->e[i] / (materials[matId].eos.E_0 * (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0)) + 1.0) /
-                                 materials[matId].eos.rho_0 + 1.0)
-                              / (materials[matId].eos.E_0 * particles->rho[i])
-                              * (2.0 * particles->e[i] - particles->p[i] / particles->rho[i]);
-                } else {
-                    Gamma_e = materials[matId].eos.till_a
-                              + materials[matId].eos.till_b /
-                                (particles->e[i] / (materials[matId].eos.E_0 * (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0)) + 1.0) *
-                                exp(-materials[matId].eos.till_beta * ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)) *
-                                    ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)));
-
-                    cs_e_sq = (Gamma_e + 1.0) * particles->p[i] / particles->rho[i]
-                              + materials[matId].eos.till_a / particles->rho[i]
-                                * exp(-(materials[matId].eos.till_alpha * ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)) +
-                                        materials[matId].eos.till_beta * ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)) *
-                                        ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0))))
-                                * (1.0 + ((particles->rho[i] / materials[matId].eos.rho_0) - 1.0)) /
-                                ((particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0))
-                                * (materials[matId].eos.till_alpha +
-                                   2.0 * materials[matId].eos.till_beta * ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)) -
-                                   (particles->rho[i] / materials[matId].eos.rho_0))
-                              + materials[matId].eos.till_b * particles->rho[i] * particles->e[i]
-                                / ((particles->e[i] / (materials[matId].eos.E_0 * (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0)) + 1.0) *
-                                   (particles->e[i] / (materials[matId].eos.E_0 * (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0)) + 1.0) *
-                                   (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0))
-                                * exp(-materials[matId].eos.till_beta * ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)) *
-                                      ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)))
-                                * (2.0 * materials[matId].eos.till_beta * ((1.0 - (particles->rho[i] / materials[matId].eos.rho_0)) / (particles->rho[i] / materials[matId].eos.rho_0)) *
-                                   (particles->e[i] / (materials[matId].eos.E_0 * (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0)) + 1.0) /
-                                   materials[matId].eos.rho_0 + 1.0)
-                                / (materials[matId].eos.E_0 * particles->rho[i])
-                                * (2.0 * particles->e[i] - particles->p[i] / particles->rho[i]);
-
-                    if (particles->p[i] < 0.0 || (particles->rho[i] / materials[matId].eos.rho_0) < materials[matId].eos.rho_limit) particles->p[i] = 0.0;
-
-                    cs_c_sq = materials[matId].eos.till_a * particles->e[i]
-                              + (materials[matId].eos.till_b * particles->e[i]) /
-                                ((particles->e[i] / (materials[matId].eos.E_0 * (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0)) + 1.0) *
-                                 (particles->e[i] / (materials[matId].eos.E_0 * (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0)) + 1.0)) *
-                                (3.0 * (particles->e[i] / (materials[matId].eos.E_0 * (particles->rho[i] / materials[matId].eos.rho_0) * (particles->rho[i] / materials[matId].eos.rho_0)) + 1.0) - 2.0)
-                              + (materials[matId].eos.till_a + 2.0 * materials[matId].eos.till_b * ((particles->rho[i] / materials[matId].eos.rho_0) - 1.0)) / particles->rho[i]
-                              + particles->p[i] / (particles->rho[i] * particles->rho[i]) * (materials[matId].eos.till_a * particles->rho[i] + materials[matId].eos.till_b * particles->rho[i] /
-                                                                                                                                               ((particles->e[i] / (materials[matId].eos.E_0 *
-                                                                                                                                                                    (particles->rho[i] /
-                                                                                                                                                                     materials[matId].eos.rho_0) *
-                                                                                                                                                                    (particles->rho[i] /
-                                                                                                                                                                     materials[matId].eos.rho_0)) +
-                                                                                                                                                 1.0) * (particles->e[i] / (materials[matId].eos.E_0 *
-                                                                                                                                                                            (particles->rho[i] /
-                                                                                                                                                                             materials[matId].eos.rho_0) *
-                                                                                                                                                                            (particles->rho[i] /
-                                                                                                                                                                             materials[matId].eos.rho_0)) +
-                                                                                                                                                         1.0)));
-
-                    y = (particles->e[i] - materials[matId].eos.E_iv) / (materials[matId].eos.E_cv - materials[matId].eos.E_iv);
-                    cs_sq = cs_e_sq * (1.0 - y) + cs_c_sq * y;
-                }
-
-                if (cs_sq < materials[matId].eos.cs_limit * materials[matId].eos.cs_limit) {
-                    particles->cs[i] = materials[matId].eos.cs_limit;
-                } else {
-                    particles->cs[i] = sqrt(cs_sq);
-                }
-            }
-/*            case EquationOfStates::EOS_TYPE_TILLOTSON: {
                 rho = particles->rho[i];
                 pressure = particles->p[i];
                 eta = rho / materials[matId].eos.rho_0;
@@ -193,7 +193,7 @@ __global__ void SPH::Kernel::calculateSoundSpeed(Particles *particles, Material 
                 z = (1.0 - eta) / eta;
 
                 if (eta >= 0.0 || particles->e[i] < materials[matId].eos.E_iv) {
-                    if (pressure < 0.0 || eta < materials[matId].eos.rho_limit[matId]) pressure = 0.0;
+                    if (pressure < 0.0 || eta < materials[matId].eos.rho_limit) pressure = 0.0;
 
                     cs_sq = materials[matId].eos.till_a * particles->e[i]
                             + (materials[matId].eos.till_b * particles->e[i]) / (omega0 * omega0) * (3.0 * omega0 - 2.0)
@@ -230,7 +230,7 @@ __global__ void SPH::Kernel::calculateSoundSpeed(Particles *particles, Material 
                                 / (materials[matId].eos.E_0 * rho)
                                 * (2.0 * particles->e[i] - pressure / rho);
 
-                    if (pressure < 0.0 || eta < materials[matId].eos.rho_limit[matId]) pressure = 0.0;
+                    if (pressure < 0.0 || eta < materials[matId].eos.rho_limit) pressure = 0.0;
 
                     cs_c_sq = materials[matId].eos.till_a * particles->e[i]
                               + (materials[matId].eos.till_b * particles->e[i]) / (omega0 * omega0) * (3.0 * omega0 - 2.0)
@@ -246,7 +246,7 @@ __global__ void SPH::Kernel::calculateSoundSpeed(Particles *particles, Material 
                 } else {
                     particles->cs[i] = sqrt(cs_sq);
                 }
-            }*/
+            }
                 break;
                 //case EquationOfStates::EOS_TYPE_ISOTHERMAL_GAS: {
                 //    // do nothing since constant

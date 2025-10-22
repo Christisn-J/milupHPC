@@ -3549,11 +3549,14 @@ real Miluphpc::particles2file(int step) {
     HighFive::DataSet h5_sml = h5file.createDataSet<real>("/sml", HighFive::DataSpace(sumParticles));
     HighFive::DataSet h5_noi = h5file.createDataSet<integer>("/noi", HighFive::DataSpace(sumParticles));
     HighFive::DataSet h5_cs = h5file.createDataSet<real>("/cs", HighFive::DataSpace(sumParticles));
+    HighFive::DataSet h5_matId = h5file.createDataSet<real>("/matId", HighFive::DataSpace(sumParticles));
 
 #if INTEGRATE_DENSITY
     HighFive::DataSet h5_drhodt = h5file.createDataSet<real>("/drhodt", HighFive::DataSpace(sumParticles));
 #endif
-
+#if INTEGRATE_ENERGY
+    HighFive::DataSet h5_dedt = h5file.createDataSet<real>("/dedt", HighFive::DataSpace(sumParticles));
+#endif
 #if SOLID
     HighFive::DataSet h5_Sxx = h5file.createDataSet<real>("/Sxx", HighFive::DataSpace(sumParticles));
 #if DIM > 1
@@ -3595,14 +3598,19 @@ real Miluphpc::particles2file(int step) {
     std::vector<std::vector<real>> x, v, a; // two dimensional vector for 3D vector data
     std::vector<keyType> k; // one dimensional vector holding particle keys
     std::vector<real> mass;
-    std::vector<int> particleProc;
+    std::vector<integer> particleProc;
+
 #if SPH_SIM
     std::vector<real> rho, p, e, sml, cs;
     std::vector<integer> noi;
-
+    std::vector<idInteger> matId;
 #if INTEGRATE_DENSITY
     std::vector<real> drhodt;
 #endif
+#if INTEGRATE_ENERGY
+    std::vector<real> dedt;
+#endif
+
 #if SOLID
     std::vector<real> Sxx;
 #if DIM > 1
@@ -3628,7 +3636,7 @@ real Miluphpc::particles2file(int step) {
 
     Logger(INFO) << "copying particles ...";
 
-    particleHandler->copyDistribution(To::host, true, false);
+    particleHandler->copyDistribution(To::host, true, true);
 #if SPH_SIM
     particleHandler->copySPH(To::host);
 #endif
@@ -3680,8 +3688,13 @@ real Miluphpc::particles2file(int step) {
         sml.push_back(particleHandler->h_sml[i]);
         noi.push_back(particleHandler->h_noi[i]);
         cs.push_back(particleHandler->h_cs[i]);
+        matId.push_back(particleHandler->h_materialId[i]);
+
 #if INTEGRATE_DENSITY
         drhodt.push_back(particleHandler->h_drhodt[i]);
+#endif
+#if INTEGRATE_ENERGY
+        dedt.push_back(particleHandler->h_dedt[i]);
 #endif
 #if SOLID
         Sxx.push_back(particleHandler->h_Sxx[i]);
@@ -3739,7 +3752,6 @@ real Miluphpc::particles2file(int step) {
                 {std::size_t(numParticlesLocal), std::size_t(DIM)}).write(x);
     vel.select({nOffset, 0},
                 {std::size_t(numParticlesLocal), std::size_t(DIM)}).write(v);
-
 	acc.select({nOffset, 0},
                 {std::size_t(numParticlesLocal), std::size_t(DIM)}).write(a);
     key.select({nOffset}, {std::size_t(numParticlesLocal)}).write(k);
@@ -3752,8 +3764,12 @@ real Miluphpc::particles2file(int step) {
     h5_sml.select({nOffset}, {std::size_t(numParticlesLocal)}).write(sml);
     h5_noi.select({nOffset}, {std::size_t(numParticlesLocal)}).write(noi);
     h5_cs.select({nOffset}, {std::size_t(numParticlesLocal)}).write(cs);
+    h5_matId.select({nOffset}, {std::size_t(numParticlesLocal)}).write(matId);
 #if INTEGRATE_DENSITY
     h5_drhodt.select({nOffset},{std::size_t(numParticlesLocal)}).write(drhodt);
+#endif
+#if INTEGRATE_ENERGY
+    h5_dedt.select({nOffset},{std::size_t(numParticlesLocal)}).write(dedt);
 #endif
 #if SOLID
     h5_Sxx.select({nOffset}, {std::size_t(numParticlesLocal)}).write(Sxx);

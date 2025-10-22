@@ -581,6 +581,11 @@ namespace ParticlesNS {
                            particles->rho[bodyIndex + offset]);
                 }
 
+                if (std::isnan(particles->e[bodyIndex + offset])){
+                    printf("NAN for index: e%i %f [kg/m³] %f\n", bodyIndex + offset,
+                           particles->e[bodyIndex + offset]);
+                }
+
 
 
 //                if (particles->x[bodyIndex + offset] > 1.e250

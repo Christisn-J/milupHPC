@@ -259,7 +259,7 @@ int main(int argc, char** argv)
     if (parameters.maxTimeStep < 0.0) {
         parameters.maxTimeStep = confP.getVal<real>("maxTimeStep");
     }
-    parameters.maxTimeStep = checkInRange(parameters.maxTimeStep, 0.0, parameters.timeEnd, parameters.timeStep, "maxTimeStep");
+    parameters.maxTimeStep = checkInRange(parameters.maxTimeStep, 0.0, parameters.timeEnd, parameters.timeEnd, "maxTimeStep");
 
     // --- Output rank ---
     parameters.outputRank = confP.getVal<int>("outputRank");

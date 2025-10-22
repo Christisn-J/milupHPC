@@ -1047,8 +1047,12 @@ void ParticleHandler::copySPH(To::Target target) {
     cuda::copy(h_sml, d_sml, length, target);
     cuda::copy(h_noi, d_noi, length, target);
     cuda::copy(h_cs, d_cs, length, target);
+    cuda::copy(h_materialId, d_materialId, length, target);
 #if INTEGRATE_DENSITY
     cuda::copy(h_drhodt, d_drhodt, length, target);
+#endif
+#if INTEGRATE_ENERGY
+    cuda::copy(h_dedt, d_dedt, length, target);
 #endif
 #if SOLID
     cuda::copy(h_Sxx, d_Sxx, length, target);

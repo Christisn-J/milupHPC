@@ -54,8 +54,8 @@ namespace EOS {
      * @param particles Particles class instance
      * @param index Relevant particle index
      */
-    __device__ void tillotson(Material *materials, Particles *particles, int index);
-//    __device__ void tillotson(Material *materials, Particles *particles, int index, double rho, double e, double &eta, double &mu, double &p1, double &p2);
+//    __device__ void tillotson(Material *materials, Particles *particles, int index);
+    __device__ void tillotson(Material *materials, Particles *particles, int index, double rho, double e, double &eta, double &mu, double &p1, double &p2);
 
     /**
      * @brief Isothermal gas.
