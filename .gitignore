@@ -26,6 +26,7 @@ include/parameter.h
 **/images/
 testcases/**/*.h5
 testcases/**/*.png
+setup/
 
 # Ignore binaries and temporary executables
 attraction_*
