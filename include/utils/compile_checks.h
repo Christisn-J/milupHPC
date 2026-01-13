@@ -1,7 +1,21 @@
-//
-// Created by Christian Jetter on 09.09.25.
-// Purpose: Runtime checks for configuration values with fallback logic
-//
+/**
+ * @file compile_checks.h
+ * @brief Runtime validation of configuration values with optional fallback and termination logic
+ *
+ * This header provides template functions and utility functions to validate
+ * runtime configuration values, including:
+ * - Ensuring numerical parameters are within specified bounds
+ * - Checking boolean parameters
+ * - Validating the availability of files and directories
+ *
+ * If a value is invalid, the functions can either:
+ * - Log a warning and return a fallback value
+ * - Log an error and terminate the program (optionally via MPI_Finalize)
+ *
+ * @author Christian Jetter
+ * @date 09.09.25
+ * @bug No known bugs
+ */
 
 #ifndef MILUPHPC_COMPILE_CHECKS_H
 #define MILUPHPC_COMPILE_CHECKS_H
@@ -9,17 +23,18 @@
 #include "logger.h"
 #include "../constants.h"
 
-#include <string>     // std::string
-#include <fstream>    // std::ifstream
-#include <cstdlib>    // exit()
-#include <mpi.h>      // MPI_Finalize()
+#include <string>
+#include <fstream>
+#include <cstdlib>
+#include <mpi.h>
+#include <boost/filesystem.hpp>  // For directory checks
 
 // ------------------------------
-// Value Constraint Checks
+// VALUE CONSTRAINT CHECKS
 // ------------------------------
 
 /**
- * Ensures a value is at least 'min'. If not, logs a warning and returns fallback.
+ * @brief Ensures a value is at least `min`. Returns `fallback` if invalid.
  */
 template<typename T>
 T checkMinValue(T value, T min, T fallback, const std::string& name,
@@ -41,7 +56,7 @@ T checkMinValue(T value, T min, T fallback, const std::string& name,
 }
 
 /**
- * Ensures a value is at most 'max'. If not, logs a warning and returns fallback.
+ * @brief Ensures a value is at most `max`. Returns `fallback` if invalid.
  */
 template<typename T>
 T checkMaxValue(T value, T max, T fallback, const std::string& name,
@@ -63,7 +78,7 @@ T checkMaxValue(T value, T max, T fallback, const std::string& name,
 }
 
 /**
- * Ensures a value is within [min, max]. If not, logs a warning and returns fallback.
+ * @brief Ensures a value is within `[min, max]`. Returns `fallback` if invalid.
  */
 template<typename T>
 T checkInRange(T value, T min, T max, T fallback, const std::string& name,
@@ -84,19 +99,30 @@ T checkInRange(T value, T min, T max, T fallback, const std::string& name,
     return value;
 }
 
-bool checkBoolValue(ConfigParser& conf, const std::string& key, bool fallback, const std::string& source = "config")
+// ------------------------------
+// BOOLEAN VALUE CHECKS
+// ------------------------------
+
+/**
+ * @brief Reads a boolean parameter from a ConfigParser and returns fallback if missing.
+ */
+inline bool checkBoolValue(ConfigParser& conf, const std::string& key, bool fallback,
+                           const std::string& source = "config")
 {
     try {
         bool value = conf.getVal<bool>(key);
         Logger(CHECK) << "Using parameter '" << key << "' from " << source << ": " << std::boolalpha << value;
         return value;
-    } catch (const std::exception& e) {
+    } catch (const std::exception&) {
         Logger(WARN) << "Parameter '" << key << "' missing in " << source << ", using fallback: " << std::boolalpha << fallback;
         return fallback;
     }
 }
 
-bool checkBoolValue(const cxxopts::ParseResult& result, const std::string& key, bool fallback)
+/**
+ * @brief Reads a boolean parameter from CLI (cxxopts) and returns fallback if missing.
+ */
+inline bool checkBoolValue(const cxxopts::ParseResult& result, const std::string& key, bool fallback)
 {
     if (result.count(key)) {
         bool value = result[key].as<bool>();
@@ -108,30 +134,23 @@ bool checkBoolValue(const cxxopts::ParseResult& result, const std::string& key, 
     }
 }
 
-
-
 // ------------------------------
-// File Availability Check
+// FILE AND DIRECTORY CHECKS
 // ------------------------------
 
 /**
- * Checks if a file exists and is readable. If not, optionally logs and terminates.
- * @param file Path to file
- * @param terminate If true, the program exits on failure
- * @param message Optional additional log message
- * @return true if file is available, false otherwise
+ * @brief Checks if a file exists and is readable.
+ * @return true if available, false otherwise
+ * @param terminate Exit program if true and file is missing
+ * @param message Optional log message
  */
 inline bool checkFileAvailable(const std::string& file, bool terminate = false, const std::string& message = "")
 {
     std::ifstream fileStream(file);
-    if (fileStream.good()) {
-        return true;
-    }
+    if (fileStream.good()) return true;
 
     if (terminate) {
-        if (!message.empty()) {
-            Logger(WARN) << message;
-        }
+        if (!message.empty()) Logger(WARN) << message;
         Logger(ERROR) << "Provided file not available: " << file;
         MPI_Finalize();
         std::exit(EXIT_FAILURE);
@@ -140,13 +159,11 @@ inline bool checkFileAvailable(const std::string& file, bool terminate = false, 
     return false;
 }
 
-
 /**
- * Checks if a directory exists and is valid. If not, optionally logs and terminates.
- * @param dir Path to directory
- * @param terminate If true, the program exits on failure
- * @param message Optional additional log message
- * @return true if directory exists and is a directory, false otherwise
+ * @brief Checks if a directory exists and is valid.
+ * @return true if directory exists and is valid, false otherwise
+ * @param terminate Exit program if true and directory is missing/invalid
+ * @param message Optional log message
  */
 inline bool checkDirectoryAvailable(const std::string& dir, bool terminate = false, const std::string& message = "")
 {
@@ -154,32 +171,19 @@ inline bool checkDirectoryAvailable(const std::string& dir, bool terminate = fal
         if (boost::filesystem::exists(dir)) {
             if (!boost::filesystem::is_directory(dir)) {
                 Logger(ERROR) << "Path exists but is not a directory: " << dir;
-                if (terminate) {
-                    Logger(WARN) << message;
-                    MPI_Finalize();
-                    exit(EXIT_FAILURE);
-                }
+                if (terminate) { Logger(WARN) << message; MPI_Finalize(); exit(EXIT_FAILURE); }
                 return false;
             }
-            return true; // Directory exists und ist gültig
+            return true;
         } else {
             Logger(ERROR) << "Directory does not exist: " << dir;
-            if (terminate) {
-                Logger(WARN) << message;
-                MPI_Finalize();
-                exit(EXIT_FAILURE);
-            }
+            if (terminate) { Logger(WARN) << message; MPI_Finalize(); exit(EXIT_FAILURE); }
             return false;
         }
     }
 
     Logger(ERROR) << "No valid directory provided!";
-    if (terminate) {
-        Logger(WARN) << message;
-        MPI_Finalize();
-        exit(EXIT_FAILURE);
-    }
-
+    if (terminate) { Logger(WARN) << message; MPI_Finalize(); exit(EXIT_FAILURE); }
     return false;
 }
 

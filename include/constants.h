@@ -1,6 +1,21 @@
-//
-// Created by Christian Jetter on 09.09.25.
-//
+/**
+ * @file constants.h
+ * @brief Default, invalid, and physical constants with type-safe selectors
+ *
+ * This header provides:
+ * - Default and invalid sentinel values for integer, real, and string types
+ * - Physical constants (e.g., gravitational constant)
+ * - Type-safe templates to select default or invalid values
+ * - Enumerations and structs for execution targets, smoothing kernels, integrators, and EOS types
+ * - Particle entry field definitions based on the simulation dimension
+ *
+ * The goal is to centralize all constants and default values in one place, with compile-time
+ * type safety and descriptive string conversion where appropriate.
+ *
+ * @author Christian Jetter
+ * @date 09.09.25
+ * @bug No known bugs
+ */
 
 #ifndef MILUPHPC_CONSTANTS_H
 #define MILUPHPC_CONSTANTS_H
@@ -9,32 +24,78 @@
 #include "parameter.h"
 #include "utils/define_checks.h"
 
-#include <string>
 #include <limits>
 
+/**
+ * @brief Enumeration for selecting default or invalid values.
+ */
+enum class ValueMode {
+    DefaultValue, ///< Use default values
+    InvalidValue  ///< Use invalid sentinel values
+};
+
+/// @brief Namespace holding default values for various types
 namespace Default {
-    constexpr integer integer_value = -1;
-    constexpr real real_value = -1.0;
-    constexpr const char* string_value = "-";
-    constexpr integer numberFiles = 1;
-    constexpr integer verbose_lvl = 0;
-    constexpr bool loadBalancing = false;
+    constexpr integer integer_value = 0;   ///< Default integer value
+    constexpr real real_value = 0.0;       ///< Default real value
+    constexpr const char* string_value = "-"; ///< Default string value
+    constexpr integer numberFiles = 1;     ///< Default number of files
+    constexpr integer verbose_lvl = 0;     ///< Default verbosity level
+    constexpr bool loadBalancing = false;  ///< Default load balancing flag
 }
 
-namespace Invalid {
-    constexpr integer integer_value = -1;
-    constexpr real real_value = -1.0;
-}
-
+/// @brief Namespace holding physical constants
 namespace Constants {
-    constexpr real
-    G = 6.67430e-11;
+    namespace physics{
+        constexpr real G = 6.67430e-11; ///< Gravitational constant
+    }
+    namespace numerics{
+        constexpr real dbl_max = std::numeric_limits<real>::max();
+        constexpr real dbl_min = std::numeric_limits<real>::min();
+    }
 }
 
-// Template-Struktur
+#define DBL_MAX Constants::numerics::dbl_max
+#define DBL_MIN Constants::numerics::dbl_min
+
+/// @brief Namespace holding invalid values for various types
+namespace Invalid {
+    constexpr integer integer_value = std::numeric_limits<integer>::min(); ///< Minimum integer as invalid value
+    constexpr real real_value = -std::numeric_limits<real>::infinity();    ///< Negative infinity as invalid real
+}
+
+/**
+ * @brief Template to select a value based on ValueMode.
+ *
+ * @tparam MODE Either DefaultValue or InvalidValue
+ * @tparam T Type of the value
+ */
+template<ValueMode MODE, typename T>
+struct ValueSelector;
+
 template<typename T>
 struct DefaultValue;
 
+template<typename T>
+struct InvalidValue;
+
+/**
+ * @brief Specialization of ValueSelector for default values
+ */
+template<typename T>
+struct ValueSelector<ValueMode::DefaultValue, T> {
+    static constexpr T value() { return DefaultValue<T>::value(); }
+};
+
+/**
+ * @brief Specialization of ValueSelector for invalid values
+ */
+template<typename T>
+struct ValueSelector<ValueMode::InvalidValue, T> {
+    static constexpr T value() { return InvalidValue<T>::value(); }
+};
+
+// Default value specializations
 template<>
 struct DefaultValue<integer> {
     static constexpr integer value() { return Default::integer_value; }
@@ -43,20 +104,17 @@ struct DefaultValue<integer> {
 
 template<>
 struct DefaultValue<real> {
-    static constexpr real value() { return Default::real_value; }
+    static constexpr real value() { return ::Default::real_value; }
     static std::string str() { return std::to_string(value()); }
 };
 
 template<>
 struct DefaultValue<std::string> {
-    static std::string value() { return Default::string_value; }
+    static std::string value() { return ::Default::string_value; }
     static std::string str() { return value(); }
 };
 
-// Helper template to get invalid values based on type
-template<typename T>
-struct InvalidValue;
-
+// Invalid value specializations
 template<>
 struct InvalidValue<integer> {
     static constexpr integer value() { return Invalid::integer_value; }
@@ -69,58 +127,17 @@ struct InvalidValue<real> {
     static std::string str() { return std::to_string(value()); }
 };
 
-constexpr real
-dbl_max = std::numeric_limits<real>::max();
-#define DBL_MAX dbl_max;
-
-
-typedef struct SimulationParameters {
-    std::string directory;
-    std::string logDirectory;
-    int verbosity;
-    bool timeKernels;
-    int numOutputFiles;
-    real timeStep;
-    real maxTimeStep;
-    real timeEnd;
-    bool loadBalancing;
-    int loadBalancingInterval;
-    int loadBalancingBins;
-    std::string inputFile;
-    std::string materialConfigFile;
-    int outputRank;
-    bool performanceLog;
-    bool particlesSent2H5;
-    int sfcSelection;
-    int integratorSelection;
-//#if GRAVITY_SIM
-    real theta;
-    real smoothing;
-    int gravityForceVersion;
-//#endif
-//#if SPH_SIM
-    int smoothingKernelSelection;
-    int sphFixedRadiusNNVersion;
-//#endif
-    bool removeParticles;
-    int removeParticlesCriterion;
-    real removeParticlesDimension;
-    int bins;
-    bool calculateAngularMomentum;
-    bool calculateEnergy;
-    bool calculateCenterOfMass;
-    real particleMemoryContingent;
-    int domainListSize;
-} SimulationParameters;
-
+/**
+ * @brief Target location for execution or memory operations
+ */
 struct To {
     enum Target {
-        host, device
+        host,   ///< CPU
+        device  ///< GPU
     };
     Target t_;
 
     To(Target t) : t_(t) {}
-
     operator Target() const { return t_; }
 
 private:
@@ -128,14 +145,20 @@ private:
     operator T() const;
 };
 
+/**
+ * @brief Smoothing kernel types
+ */
 struct Smoothing {
     enum Kernel {
-        spiky, cubic_spline, wendlandc2, wendlandc4, wendlandc6
+        spiky,
+        cubic_spline,
+        wendlandc2,
+        wendlandc4,
+        wendlandc6
     };
     Kernel t_;
 
     Smoothing(Kernel t) : t_(t) {}
-
     operator Smoothing() const { return t_; }
 
 private:
@@ -143,14 +166,17 @@ private:
     operator T() const;
 };
 
+/**
+ * @brief Execution location for computations
+ */
 struct Execution {
     enum Location {
-        host, device
+        host,   ///< CPU
+        device  ///< GPU
     };
     Location t_;
 
     Execution(Location t) : t_(t) {}
-
     operator Location() const { return t_; }
 
 private:
@@ -158,29 +184,36 @@ private:
     operator T() const;
 };
 
+/**
+ * @brief Space-filling curve types
+ */
 struct Curve {
     enum Type {
-        lebesgue, hilbert
+        lebesgue,
+        hilbert
     };
     Type t_;
 
     Curve(Type t) : t_(t) {}
-
     operator Type() const { return t_; }
-    //friend std::ostream& operator<<(std::ostream& out, const Curve::Type curveType);
+
 private:
     template<typename T>
     operator T() const;
 };
 
+/**
+ * @brief Integrator selection types for time integration
+ */
 struct IntegratorSelection {
     enum Type {
-        explicit_euler, predictor_corrector_euler, leapfrog
+        explicit_euler,
+        predictor_corrector_euler,
+        leapfrog
     };
     Type t_;
 
     IntegratorSelection(Type t) : t_(t) {}
-
     operator Type() const { return t_; }
 
 private:
@@ -188,7 +221,9 @@ private:
     operator T() const;
 };
 
-/// implemented equation of states
+/**
+ * @brief Equation of State (EOS) types
+ */
 enum EquationOfStates {
     //EOS_TYPE_ACCRETED = -2, /// special flag for particles that got accreted by a gravitating point mass
     //EOS_TYPE_IGNORE = -1, /// particle is ignored
@@ -208,6 +243,10 @@ enum EquationOfStates {
     //EOS_TYPE_JUTZI_ANEOS = 13/// ANEOS EOS with p-alpha model by Jutzi et al.
 };
 
+
+/**
+ * @brief Particle entry fields
+ */
 struct Entry {
     enum Name {
         x,
@@ -221,8 +260,7 @@ struct Entry {
     };
     Name t_;
 
-    Entry(Name t) : t_(t) {}
-
+    explicit Entry(Name t) : t_(t) {}
     operator Name() const { return t_; }
 
 private:
@@ -230,4 +268,4 @@ private:
     operator T() const;
 };
 
-#endif //MILUPHPC_CONSTANTS_H
+#endif // MILUPHPC_CONSTANTS_H

@@ -25,6 +25,11 @@
 #include <cuda_runtime.h>
 #include <assert.h>
 
+#include <cstdio>   // for printf
+#include <cmath>    // for std::isfinite
+#include <cassert>  // for assert
+
+
 #ifdef __CUDACC__
 #define CUDA_CALLABLE_MEMBER __host__ __device__
 #else
@@ -86,7 +91,7 @@ __device__ double atomicAdd(double* address, double val);
  * @param line Line
  * @param abort Abort in case of error
  */
-void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true);
+void gpuAssert(cudaError_t code, const char *file, int line, bool abort = true);
 
 /**
  * @brief Check CUDA call.
@@ -96,7 +101,7 @@ void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true);
  * @param fileName
  * @param line
  */
-void checkCudaCall(cudaError_t command, const char * commandName, const char * fileName, int line);
+void checkCudaCall(cudaError_t command, const char *commandName, const char *fileName, int line);
 
 namespace CudaUtils {
     namespace Kernel {
@@ -246,6 +251,73 @@ namespace cuda {
          */
         __device__ real pow(real a, real b);
     }
+
+    /**
+     * @brief Utility functions for floating-point sanity checks.
+     *
+     * Works for type `real` and is CUDA device compatible.
+     * Integrates with Constants and Invalid values.
+     */
+    namespace util {
+        __host__ __device__ __forceinline__ void checkFinite(real v, const char *name, int id) {
+#ifdef __CUDA_ARCH__
+            // device code
+            if (!isfinite(v)) {
+                printf("Error: value %s (%e) for particle %d is not finite!\n", name, v, id);
+                assert(0);
+            }
+#else
+            // host code
+            if (!std::isfinite(v)) {
+                printf("Error: value %s (%e) for particle %d is not finite!\n", name, v, id);
+                assert(0);
+            }
+#endif
+        }
+
+        /**
+         * @brief Check if a floating-point value is NaN (Not a Number).
+         *
+         * Works for both single and double precision (`real` type).
+         *
+         * @param x Value to check
+         * @return true if x is NaN, false otherwise
+         */
+        __device__ inline bool isNan(real x);
+
+        /**
+         * @brief Check if a floating-point value is infinite.
+         *
+         * Works for both single and double precision (`real` type).
+         *
+         * @param x Value to check
+         * @return true if x is +inf or -inf, false otherwise
+         */
+        __device__ inline bool isInf(real x);
+
+        /**
+         * @brief Detect potential overflow for a floating-point value.
+         *
+         * Uses a safety threshold of 90% of the maximal representable `real` value.
+         *
+         * @param x Value to check
+         * @return true if x exceeds the safe threshold (positive or negative), false otherwise
+         */
+        __device__ inline bool isOverflow(real x);
+
+        /**
+         * @brief Detect potential underflow for a floating-point value.
+         *
+         * Values are considered underflow if they are non-zero but smaller than the minimal
+         * normal `real` value.
+         *
+         * @param x Value to check
+         * @return true if x is underflow, false otherwise
+         */
+        __device__ inline bool isUnderflow(real x);
+
+    } // namespace util
+
 }
 
 #endif //MILUPHPC_CUDAUTILITIES_CUH
