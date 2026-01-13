@@ -255,11 +255,21 @@ int main(int argc, char** argv)
     parameters.timeStep = checkInRange(confP.getVal<real>("timeStep"), 0.0, parameters.timeEnd, InvalidValue<real>::value(), "timeStep", "config", true);
 
     // Override maxTimeStep via command line if set, else use config
-    parameters.maxTimeStep = result["max-time-step"].as<real>();
-    if (parameters.maxTimeStep < 0.0) {
+    // CLI oder config
+    real cliMaxTS;
+    bool cliProvided = result.count("max-time-step") > 0;
+
+    if (cliProvided) {
+        cliMaxTS = result["max-time-step"].as<real>();
+        Logger(DEBUG) << "maxTimeStep provided via CLI: " << cliMaxTS;
+        parameters.maxTimeStep = cliMaxTS;
+    } else {
         parameters.maxTimeStep = confP.getVal<real>("maxTimeStep");
+        Logger(DEBUG) << "maxTimeStep from config: " << parameters.maxTimeStep;
     }
-    parameters.maxTimeStep = checkInRange(parameters.maxTimeStep, 0.0, parameters.timeEnd, parameters.timeEnd, "maxTimeStep");
+
+    parameters.maxTimeStep = checkInRange(parameters.maxTimeStep, 1e-100, parameters.timeEnd, parameters.timeEnd, "maxTimeStep");
+
 
     // --- Output rank ---
     parameters.outputRank = confP.getVal<int>("outputRank");
