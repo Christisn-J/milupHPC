@@ -3042,6 +3042,13 @@ real Miluphpc::parallel_sph() {
 
     time = SPH::Kernel::Launch::internalForces(kernelHandler.kernel, materialHandler->d_materials, treeHandler->d_tree,
                                         particleHandler->d_particles, particleHandler->d_nnl, numParticlesLocal);
+
+#if DEBUGGING
+    Logger(CHECK) << "checking for NANs after internalForces...";
+    ParticlesNS::Kernel::Launch::check4nans(particleHandler->d_particles, numParticlesLocal);
+    cudaDeviceSynchronize();
+#endif
+
     Logger(DEBUG) << "Test Miluphpc 00 achieved";
     Logger(TIME) << "sph: internalForces: " << time << " ms";
     profiler.value2file(ProfilerIds::Time::SPH::internalForces, time);
@@ -3549,7 +3556,7 @@ real Miluphpc::particles2file(int step) {
     HighFive::DataSet h5_sml = h5file.createDataSet<real>("/sml", HighFive::DataSpace(sumParticles));
     HighFive::DataSet h5_noi = h5file.createDataSet<integer>("/noi", HighFive::DataSpace(sumParticles));
     HighFive::DataSet h5_cs = h5file.createDataSet<real>("/cs", HighFive::DataSpace(sumParticles));
-    HighFive::DataSet h5_matId = h5file.createDataSet<real>("/matId", HighFive::DataSpace(sumParticles));
+    HighFive::DataSet h5_matId = h5file.createDataSet<idInteger>("/matId", HighFive::DataSpace(sumParticles));
 
 #if INTEGRATE_DENSITY
     HighFive::DataSet h5_drhodt = h5file.createDataSet<real>("/drhodt", HighFive::DataSpace(sumParticles));
