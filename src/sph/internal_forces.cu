@@ -1,5 +1,6 @@
 #include "../../include/sph/internal_forces.cuh"
 #include "../../include/cuda_utils/cuda_launcher.cuh"
+#define CHECK_INTERNAL_FORCES 1
 
 __global__ void SPH::Kernel::internalForces(::SPH::SPH_kernel kernel, Material *materials, Tree *tree, Particles *particles,
                                             int *interactions, int numRealParticles) {
@@ -109,7 +110,9 @@ __global__ void SPH::Kernel::internalForces(::SPH::SPH_kernel kernel, Material *
     real dWdx[DIM];
     real Wj;
     real dWdxj[DIM];
-    real pij = 0;
+#if ARTIFICIAL_VISCOSITY
+    real pij;
+#endif
     real r;
     real accels[DIM];
     real accelsj[DIM];
@@ -130,8 +133,10 @@ __global__ void SPH::Kernel::internalForces(::SPH::SPH_kernel kernel, Material *
 #endif
 #endif
 
+#if ARTIFICIAL_VISCOSITY
         alpha = materials[matId].artificialViscosity.alpha; //matAlpha[matId];
         beta = materials[matId].artificialViscosity.beta; //matBeta[matId];
+#endif
         muijmax = 0;
 
         sml1 = particles->sml[i];
@@ -152,6 +157,13 @@ __global__ void SPH::Kernel::internalForces(::SPH::SPH_kernel kernel, Material *
                 // set rotation rate and strain rate tensor to zero
                 edot[d][e] = 0.0;
                 rdot[d][e] = 0.0;
+                sigma_i[d][e] = 0.0;
+                sigma_j[d][e] = 0.0;
+                S_i[d][e] = 0.0;
+#if ARTIFICIAL_STRESS
+                R_i[d][e] = 0.0;
+                R_j[d][e] = 0.0;
+#endif
             }
         }
 #endif
@@ -198,6 +210,89 @@ __global__ void SPH::Kernel::internalForces(::SPH::SPH_kernel kernel, Material *
 #if INTEGRATE_SML
         particles->dsmldt[i] = 0.0;
 #endif
+
+#if CHECK_INTERNAL_FORCES
+        //
+        // Partikelzustand aus dem Speicher prüfen
+        //
+        cuda::util::checkFinite(particles->x[i], "x", i);
+#if DIM > 1
+        cuda::util::checkFinite(particles->y[i], "y", i);
+#if DIM == 3
+        cuda::util::checkFinite(particles->z[i], "z", i);
+#endif
+#endif
+
+        cuda::util::checkFinite(particles->vx[i], "vx", i);
+#if DIM > 1
+        cuda::util::checkFinite(particles->vy[i], "vy", i);
+#if DIM == 3
+        cuda::util::checkFinite(particles->vz[i], "vz", i);
+#endif
+#endif
+
+        cuda::util::checkFinite(particles->rho[i], "rho", i);
+        cuda::util::checkFinite(particles->p[i],   "p", i);
+        cuda::util::checkFinite(particles->cs[i],  "cs", i);
+        cuda::util::checkFinite(particles->sml[i], "sml", i);
+        cuda::util::checkFinite(particles->mass[i], "mass", i);
+
+        cuda::util::checkFinite(particles->ax[i], "ax", i);
+#if DIM > 1
+        cuda::util::checkFinite(particles->ay[i], "ay", i);
+#if DIM == 3
+        cuda::util::checkFinite(particles->az[i], "az", i);
+#endif
+#endif
+
+        cuda::util::checkFinite(particles->drhodt[i], "drhodt", i);
+#if INTEGRATE_ENERGY
+        cuda::util::checkFinite(particles->dedt[i], "dedt", i);
+#endif
+#if INTEGRATE_SML
+        cuda::util::checkFinite(particles->dsmldt[i], "dsmldt", i);
+#endif
+
+#if SOLID
+        cuda::util::checkFinite(particles->Sxx[i], "Sxx", i);
+#if DIM > 1
+        cuda::util::checkFinite(particles->Sxy[i], "Sxy", i);
+        cuda::util::checkFinite(particles->Syy[i], "Syy", i);
+#if DIM == 3
+        cuda::util::checkFinite(particles->Sxz[i], "Sxz", i);
+    cuda::util::checkFinite(particles->Syz[i], "Syz", i);
+#endif
+#endif
+#endif
+
+        //
+        // Lokale Kopien der Partikelwerte prüfen
+        //
+        cuda::util::checkFinite(x, "x_local", i);
+#if DIM > 1
+        cuda::util::checkFinite(y, "y_local", i);
+#if DIM == 3
+        cuda::util::checkFinite(z, "z_local", i);
+#endif
+#endif
+
+        cuda::util::checkFinite(vx, "vx_local", i);
+#if DIM > 1
+        cuda::util::checkFinite(vy, "vy_local", i);
+#if DIM == 3
+        cuda::util::checkFinite(vz, "vz_local", i);
+#endif
+#endif
+
+        cuda::util::checkFinite(sml,  "sml_local",  i);
+        cuda::util::checkFinite(sml1, "sml1_local", i);
+        cuda::util::checkFinite(drhodt, "drhodt_local", i);
+#if INTEGRATE_ENERGY
+        cuda::util::checkFinite(dedt, "dedt_local", i);
+#endif
+
+#endif // CHECK_INTERNAL_FORCES
+
 // ad dSdt to be set to zero?
 
         // if particle has no interactions continue and set all derivs to zero
@@ -336,11 +431,11 @@ __global__ void SPH::Kernel::internalForces(::SPH::SPH_kernel kernel, Material *
             // add plasticity to S of j
             SPH::applyPlasticity(materials, particles->materialId[j], particles, j);
 #endif
+
             // get sigma_i
             SPH::calcStress(particles, sigma_i, i);
             // get sigma_j
             SPH::calcStress(particles, sigma_j, j);
-
 
             // calculate edot and rdot
             // edot_ab = 0.5 * (d_b v_a + d_a v_b)
@@ -375,8 +470,8 @@ __global__ void SPH::Kernel::internalForces(::SPH::SPH_kernel kernel, Material *
 #endif // DIM > 1
 #endif // SOLID
 
+#if ARTIFICIAL_VISCOSITY
             pij = 0.0;
-
             // artificial viscosity force only if v_ij * r_ij < 0
             if (vr < 0) {
                 csbar = 0.5*(particles->cs[i] + particles->cs[j]);
@@ -408,6 +503,7 @@ __global__ void SPH::Kernel::internalForces(::SPH::SPH_kernel kernel, Material *
                 //                  particles->cs[i], particles->cs[j]);
                 //}
             }
+#endif
 
 #if NAVIER_STOKES
             eta = (particles->eta[i] + particles->eta[j]) * 0.5 ;
@@ -506,6 +602,8 @@ __global__ void SPH::Kernel::internalForces(::SPH::SPH_kernel kernel, Material *
                 accels[d] += accelshearj[d];
             }
 #endif
+
+#if ARTIFICIAL_VISCOSITY
             // add artificial viscosity
             accels[0] += particles->mass[j]*(-pij)*dWdx[0];
 #if DIM > 1
@@ -514,6 +612,8 @@ __global__ void SPH::Kernel::internalForces(::SPH::SPH_kernel kernel, Material *
             accels[2] += particles->mass[j]*(-pij)*dWdx[2];
 #endif
 #endif
+#endif
+
             //if (std::isnan(accels[0])) {
             //    cudaTerminate("accels[0] = %e, mass = %e, pij = %e, dWdx[0] = %e\n", accels[0],
             //                  particles->mass[j], pij, dWdx[0]);
@@ -538,7 +638,9 @@ __global__ void SPH::Kernel::internalForces(::SPH::SPH_kernel kernel, Material *
 
 #if INTEGRATE_ENERGY
             if (true) { // !isRelaxationRun) {
+#if ARTIFICIAL_VISCOSITY
                 dedt += 0.5 * particles->mass[j] * pij * vvnablaW;
+#endif
                 //if (dedt < 0.) {
                 //    printf("dedt (= %e) += 0.5 * %e * %e * %e (= %e)\n", dedt, particles->mass[j], pij, vvnablaW, particles->mass[j] * pij * vvnablaW);
                 //}
@@ -582,8 +684,19 @@ __global__ void SPH::Kernel::internalForces(::SPH::SPH_kernel kernel, Material *
 
         particles->drhodt[i] = drhodt;
 
-
 #if INTEGRATE_ENERGY
+#if SOLID
+        {
+            // add elastic work term to dedt
+            real SdotEps = 0.0;
+            for (int d = 0; d < DIM; d++) {
+                for (int dd = 0; dd < DIM; dd++) {
+                    SdotEps += S_i[d][dd] * edot[d][dd];
+                }
+            }
+            dedt += SdotEps / particles->rho[i];
+        }
+#endif
         particles->dedt[i] = dedt;
 #endif // INTEGRATE_ENERGY
 
@@ -668,10 +781,70 @@ __global__ void SPH::Kernel::internalForces(::SPH::SPH_kernel kernel, Material *
         tensileMax = 0.0;
         tensileMax = CudaUtils::calculateMaxEigenvalue(sigma_i);
         particles->localStrain[i] = tensileMax/young;
-#endif // SOLI
+#endif // SOLID
+
+#if CHECK_INTERNAL_FORCES
+        // Lokale Berechnungen nach Nachbarschaftsschleife prüfen
+        cuda::util::checkFinite(r, "r_local", i);
+#if DIM > 1
+        cuda::util::checkFinite(vy, "vy_local", i);
+#endif
+#if DIM == 3
+        cuda::util::checkFinite(vz, "vz_local", i);
+#endif
+
+        // Vektorgrößen prüfen
+        for (int d = 0; d < DIM; d++) {
+            cuda::util::checkFinite(dr[d], "dr[d]_local", i);
+            cuda::util::checkFinite(dv[d], "dv[d]_local", i);
+            cuda::util::checkFinite(dWdx[d], "dWdx[d]_local", i);
+            cuda::util::checkFinite(accels[d], "accels[d]_local", i);
+            cuda::util::checkFinite(accelsj[d], "accelsj[d]_local", i);
+            cuda::util::checkFinite(accelshearj[d], "accelshearj[d]_local", i);
+        }
+
+#if ARTIFICIAL_VISCOSITY
+        cuda::util::checkFinite(pij, "pij", i);
+#endif
+
+#if SOLID
+        // Tensorgrößen prüfen
+        for (int d = 0; d < DIM; d++) {
+            for (int e = 0; e < DIM; e++) {
+                cuda::util::checkFinite(edot[d][e], "edot[d][e]_local", i);
+                cuda::util::checkFinite(rdot[d][e], "rdot[d][e]_local", i);
+                cuda::util::checkFinite(sigma_i[d][e], "sigma_i[d][e]_local", i);
+                cuda::util::checkFinite(sigma_j[d][e], "sigma_j[d][e]_local", i);
+                cuda::util::checkFinite(S_i[d][e], "S_i[d][e]_local", i);
+#if ARTIFICIAL_STRESS
+                cuda::util::checkFinite(R_i[d][e], "R_i[d][e]_local", i);
+            cuda::util::checkFinite(R_j[d][e], "R_j[d][e]_local", i);
+#endif
+            }
+        }
+
+        cuda::util::checkFinite(dSxx, "dSxx_local", i);
+#if DIM > 1
+        cuda::util::checkFinite(dSxy, "dSxy_local", i);
+        cuda::util::checkFinite(dSyy, "dSyy_local", i);
+#if DIM == 3
+        cuda::util::checkFinite(dSxz, "dSxz_local", i);
+    cuda::util::checkFinite(dSyz, "dSyz_local", i);
+#endif
+#endif
+        cuda::util::checkFinite(shear, "shear_local", i);
+        cuda::util::checkFinite(bulk, "bulk_local", i);
+        cuda::util::checkFinite(young, "young_local", i);
+        cuda::util::checkFinite(tensileMax, "tensileMax_local", i);
+#endif // SOLID
+
+#if NAVIER_STOKES
+        cuda::util::checkFinite(eta, "eta_local", i);
+    cuda::util::checkFinite(zetaij, "zetaij_local", i);
+#endif
+#endif // CHECK_INTERNAL_FORCES
 
     } // particle loop end
-
 }
 
 
