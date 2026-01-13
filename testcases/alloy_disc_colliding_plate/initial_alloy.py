@@ -13,7 +13,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../p
 import plotScatter
 
 # Konstanten ===================================================================================================
-OPTIMIZE_COMPUTATION=True
+OPTIMIZE_COMPUTATION=False
 DTYPE = 32  # oder 64
 FIELD_META = plotScatter.FIELD_META
 TYPE = {"float": np.float32 if DTYPE == 32 else np.float64, "int": np.int32 if DTYPE == 32 else np.int64}
@@ -23,6 +23,7 @@ PLANES = plotScatter.PLANES
 EXTENSION={"plot": ".png", "data": ".h5"}
 ETA = 1.3
 NEIGHBORS = (30, 180)
+SAFETY=[None, 10, 5, 2.5]
 
 # === Material definitions ===
 MATERIALS = {
@@ -198,13 +199,13 @@ def main(dim, verbose, outDir, params, dry=False):
     logging.info(f"Dimensions: {dim}D")
 
     if dim == 2:
-        IMPACTOR["sphere"]["center"] = np.array([0, TARGET["cube"]["length"] + 4 * delta + IMPACTOR["sphere"]["radius"], 0])
+        IMPACTOR["sphere"]["center"] = np.array([0, TARGET["cube"]["length"] + SAFETY[dim] * delta + IMPACTOR["sphere"]["radius"], 0])
         IMPACTOR["speed"] = [0, speed, 0]
     elif dim == 3:
-        IMPACTOR["sphere"]["center"] = np.array([0, 0, TARGET["cube"]["length"] + 4 * delta + IMPACTOR["sphere"]["radius"]])
+        IMPACTOR["sphere"]["center"] = np.array([0, 0, TARGET["cube"]["length"] + SAFETY[dim] * delta + IMPACTOR["sphere"]["radius"]])
         IMPACTOR["speed"]  = [0, 0, speed]
     else:
-        IMPACTOR["sphere"]["center"] = np.array([TARGET["cube"]["length"] + 4 * delta + IMPACTOR["sphere"]["radius"], 0, 0])
+        IMPACTOR["sphere"]["center"] = np.array([TARGET["cube"]["length"] + SAFETY[dim] * delta + IMPACTOR["sphere"]["radius"], 0, 0])
         IMPACTOR["speed"]  = [speed, 0, 0]
 
     if 3 <= verbose :
@@ -367,14 +368,15 @@ def main(dim, verbose, outDir, params, dry=False):
         logging.info(f"Saving Plots as {basename}{EXTENSION['plot']}")
         funk(
             coords,
-            datas=[total_particles[:, 6][::skip], total_particles[:, 8][::skip], velocity_magnitude[::skip], total_particles[:, 9][::skip]],
+            datas=[velocity_magnitude[::skip], total_particles[:, 6][::skip], total_particles[:, 7][::skip], total_particles[:, 8][::skip],total_particles[:, 9][::skip]],
             labels=[
-                f"Mass (m) [{FIELD_META['m']['unit']}]",
-                f"Velocity (|v|) [{FIELD_META['v']['unit']}]",
-                f"Density (ρ) [{FIELD_META['rho']['unit']}]",
-                f"specific Energy (e) [{FIELD_META['e']['unit']}]"
+                f"Velocity (|v| in [{FIELD_META['v']['unit']}])",
+                f"Mass (m in [{FIELD_META['m']['unit']}])",
+                f"Material ID (id in [-])",
+                f"Density (ρ in [{FIELD_META['rho']['unit']}])",
+                f"specific Energy (e in[{FIELD_META['e']['unit']}])"
             ],
-            cmaps=[FIELD_META['m']['cmap'], FIELD_META['v']['cmap'], FIELD_META['rho']['cmap'], FIELD_META['e']['cmap']],
+            cmaps=[FIELD_META['v']['cmap'], FIELD_META['m']['cmap'], "tab10", FIELD_META['rho']['cmap'], FIELD_META['e']['cmap']],
             filename=os.path.join(outDir, f"{basename}_hydro"),
             dpi=300,
             point_size=marker_size,
@@ -387,32 +389,21 @@ def main(dim, verbose, outDir, params, dry=False):
             plotScatter.plot_2D_slice(
                 planes,
                 (total_particles[:, 0], total_particles[:, 1], total_particles[:, 2]),
-                data=[total_particles[:, 6], total_particles[:, 8], velocity_magnitude, total_particles[:, 9]],
+                data=[velocity_magnitude, total_particles[:, 6] , total_particles[:, 7], total_particles[:, 8], total_particles[:, 9]],
                 labels=[
-                    f"Mass (m) [{FIELD_META['m']['unit']}]",
-                    f"Velocity (|v|) [{FIELD_META['v']['unit']}]",
-                    f"Density (ρ) [{FIELD_META['rho']['unit']}]",
-                    f"specific Energy (e) [{FIELD_META['e']['unit']}]"
+                    f"Velocity (|v| in [{FIELD_META['v']['unit']}])",
+                    f"Mass (m in [{FIELD_META['m']['unit']}])",
+                    f"Material ID (- in [-])",
+                    f"Density (ρ in [{FIELD_META['rho']['unit']}])",
+                    f"specific Energy (e in[{FIELD_META['e']['unit']}])"
                 ],
-                cmaps=[FIELD_META['m']['cmap'], FIELD_META['v']['cmap'], FIELD_META['rho']['cmap'], FIELD_META['e']['cmap']],
+                cmaps=[FIELD_META['v']['cmap'], FIELD_META['m']['cmap'], "tab10", FIELD_META['rho']['cmap'], FIELD_META['e']['cmap']],
                 filename=os.path.join(outDir, f"{basename}_hydro_slice"),
                 dpi=300,
                 point_size=marker_size,
                 axis_config=AXES_CONFIG,
                 alpha=alpha
             )
-
-        funk(
-            coords,
-            datas=[total_particles[:, 7][::skip]],
-            labels=["Material ID"],
-            cmaps=["tab10"],
-            filename=os.path.join(outDir, f"{basename}_id"),
-            dpi=300,
-            point_size=marker_size,
-            axis_config=AXES_CONFIG,
-            alpha=alpha,
-        )
 
     if 3 < verbose:
         with h5py.File(os.path.join(outDir, f"{basename}.h5"), "r") as f:
