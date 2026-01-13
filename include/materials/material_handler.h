@@ -72,16 +72,16 @@ public:
      */
     MaterialHandler(const char *material_cfg);
 
-    /**
-     * @brief Constructor.
-     *
-     * @param numMaterials
-     * @param ID
-     * @param interactions
-     * @param alpha
-     * @param beta
-     */
-    MaterialHandler(integer numMaterials, integer ID, integer interactions, real alpha, real beta);
+//    /**
+//     * @brief Constructor.
+//     *
+//     * @param numMaterials
+//     * @param ID
+//     * @param interactions
+//     * @param alpha
+//     * @param beta
+//     */
+//    MaterialHandler(integer numMaterials, integer ID, integer interactions, real alpha, real beta);
 
     /**
      * @brief Destructor.
@@ -121,75 +121,86 @@ public:
 
 private:
     /**
-     * @brief Reads a configuration value from the given config setting, or assigns a default invalid value if missing or mismatched.
+     * @brief Lookup a configuration value of type T from a config setting.
      *
-     * This templated helper function attempts to retrieve a configuration parameter from a libconfig setting.
-     * It supports both integer and floating point (`real`) types. The function handles cases where the
-     * data type in the config file may not exactly match the expected type:
+     * This function retrieves a configuration value from a given setting and stores it in `outValue`.
+     * If the setting or the requested value is missing, or if the type is unsupported, the function
+     * logs an error and exits without modifying `outValue`.
      *
-     * - If the expected type is integer but the config provides a real, it will cast with a warning.
-     * - If the expected type is real but the config provides an integer, it will cast safely.
-     *
-     * If the setting is missing or the type is unsupported, it assigns a predefined invalid value for the type.
-     *
-     * @tparam T The expected type of the config value (e.g., `integer` or `real`).
-     * @param setting Pointer to the parent config setting block.
-     * @param name The key name of the parameter to look up.
-     * @param outValue Pointer to the variable where the result will be stored.
-     * @param id Material ID for logging context.
+     * @tparam T The type of the configuration value to retrieve. Supported types are `integer` and `real`.
+     * @param setting Pointer to the configuration setting.
+     * @param name Name of the parameter to look up.
+     * @param outValue Pointer to the output variable where the value will be stored.
+     * @param id Material or entity ID used for logging purposes.
      */
-#include <type_traits>  // For std::is_same
+#include <type_traits>
+
+    enum class LookupMode { Required, Optional };
 
     template<typename T>
-    void lookupConfigValueOrDefault(config_setting_t *setting, const char *name, T *outValue, idInteger id) {
+    void lookupValue(config_setting_t *setting, const char *name, T *outValue, idInteger id, LookupMode mode) {
         if (!outValue) {
             Logger(ERROR) << "Output pointer is null for material ID " << id;
             return;
         }
         if (!setting) {
-            Logger(ERROR) << "Null config setting provided for material ID " << id;
-            *outValue = InvalidValue<T>::value();
+            if (mode == LookupMode::Required) {
+                Logger(ERROR) << "Null config setting for required parameter '" << name
+                              << "' in material ID " << id;
+            } else {
+                Logger(WARN) << "Null config setting for optional parameter '" << name
+                             << "' in material ID " << id;
+                *outValue = InvalidValue<T>::value();
+            }
             return;
         }
 
-        if constexpr(std::is_same<T, integer>::value)
-        {
+        bool found = false;
+
+        if constexpr(std::is_same<T, integer>::value) {
             int tempInt;
             if (config_setting_lookup_int(setting, name, &tempInt)) {
                 *outValue = static_cast<integer>(tempInt);
-                return;
+                found = true;
             } else {
-                // Falls Wert als Float vorliegt (optional)
                 double tempReal;
                 if (config_setting_lookup_float(setting, name, &tempReal)) {
                     *outValue = static_cast<integer>(tempReal);
-                    Logger(WARN) << "Casting real to integer for parameter '" << name << "' in material ID " << id;
-                    return;
+                    Logger(mode == LookupMode::Required ? ERROR : WARN)
+                            << "Casting real to integer for parameter '" << name << "' in material ID " << id;
+                    found = true;
                 }
             }
-        } else if constexpr(std::is_same<T, real>::value)
-        {
+        } else if constexpr(std::is_same<T, real>::value) {
             double tempReal;
             if (config_setting_lookup_float(setting, name, &tempReal)) {
                 *outValue = static_cast<real>(tempReal);
-                return;
+                found = true;
             } else {
-                // Falls Wert als Int vorliegt (optional)
                 int tempInt;
                 if (config_setting_lookup_int(setting, name, &tempInt)) {
                     *outValue = static_cast<real>(tempInt);
-                    return;
+                    found = true;
                 }
             }
         } else {
-            Logger(ERROR) << "lookupConfigValueOrDefault only supports 'integer' or 'real' types.";
+            Logger(ERROR) << "lookup only supports 'integer' or 'real' types.";
             *outValue = InvalidValue<T>::value();
             return;
         }
 
-        Logger(WARN) << "Missing or unsupported type for parameter '" << name << "' in material ID " << id;
-        *outValue = InvalidValue<T>::value();
+        if (!found) {
+            if (mode == LookupMode::Required) {
+                Logger(ERROR) << "Missing or unsupported type for required parameter '"
+                              << name << "' in material ID " << id;
+            } else {
+                Logger(WARN) << "Missing or unsupported type for optional parameter '"
+                             << name << "' in material ID " << id;
+                *outValue = InvalidValue<T>::value();
+            }
+        }
     }
 };
+
 
 #endif //MILUPHPC_MATERIAL_HANDLER_H
