@@ -347,7 +347,9 @@ namespace PredictorCorrectorEulerNS {
             real az;
 #endif
 #endif
+#if ARTIFICIAL_VISCOSITY
             real dtartvisc = DBL_MAX;
+#endif
 
             for (i = threadIdx.x + blockIdx.x * blockDim.x; i < numParticles; i+= blockDim.x * gridDim.x) {
 
@@ -425,10 +427,11 @@ namespace PredictorCorrectorEulerNS {
                 //}
                 temp = sml / particles->cs[i];
                 courant = cuda::math::min(courant, temp);
-
+#if ARTIFICIAL_VISCOSITY
                 temp = COURANT_FACT * sml / (particles->cs[i] + 1.2 * (materials[matId].artificialViscosity.alpha * particles->cs[i] +
                             materials[matId].artificialViscosity.beta * particles->muijmax[i]));
                 dtartvisc = min(dtartvisc, temp);
+#endif
 
 #if DIM == 1
                 temp = cuda::math::sqrt(particles->vx[i] * particles->vx[i]);
@@ -471,7 +474,9 @@ namespace PredictorCorrectorEulerNS {
             sharedCourant[i] = courant;
             sharede[i] = dte;
             sharedrho[i] = dtrho;
+#if ARTIFICIAL_VISCOSITY
             sharedArtVisc[i] = dtartvisc;
+#endif
             sharedVmax[i] = vmax;
 
             for (j = NUM_THREADS_LIMIT_TIME_STEP / 2; j > 0; j /= 2) {
@@ -482,7 +487,9 @@ namespace PredictorCorrectorEulerNS {
                     sharedCourant[i] = courant = cuda::math::min(courant, sharedCourant[k]);
                     sharede[i] = dte = cuda::math::min(dte, sharede[k]);
                     sharedrho[i] = dtrho = cuda::math::min(dtrho, sharedrho[k]);
+#if ARTIFICIAL_VISCOSITY
                     sharedArtVisc[i] = dtartvisc = cuda::math::min(dtartvisc, sharedArtVisc[k]);
+#endif
                     sharedVmax[i] = vmax = cuda::math::max(vmax, sharedVmax[k]);
                 }
             }
@@ -493,7 +500,9 @@ namespace PredictorCorrectorEulerNS {
                 blockShared->courant[k] = courant;
                 blockShared->e[k] = dte;
                 blockShared->rho[k] = dtrho;
+#if ARTIFICIAL_VISCOSITY
                 blockShared->artVisc[k] = dtartvisc;
+#endif
                 blockShared->vmax[k] = vmax;
 
 
@@ -505,7 +514,9 @@ namespace PredictorCorrectorEulerNS {
                         courant = cuda::math::min(courant, blockShared->courant[j]);
                         dte = cuda::math::min(dte, blockShared->e[j]);
                         dtrho = cuda::math::min(dtrho, blockShared->rho[j]);
+#if ARTIFICIAL_VISCOSITY
                         dtartvisc = cuda::math::min(dtartvisc, blockShared->artVisc[j]);
+#endif
                         vmax = cuda::math::min(vmax, blockShared->vmax[j]);
                     }
                     // set new timestep
@@ -526,8 +537,10 @@ namespace PredictorCorrectorEulerNS {
                     //printf("dtrho: %e\n", dtrho);
 #endif
 
+#if ARTIFICIAL_VISCOSITY
                     *simulationTime->dt = cuda::math::min(*simulationTime->dt, dtartvisc);
                     //printf("viscos : dt = %e\n", dtartvisc);
+#endif
 
                     *simulationTime->dt = cuda::math::min(*simulationTime->dt, *simulationTime->subEndTime - *simulationTime->currentTime);
                     if (*simulationTime->dt > *simulationTime->dt_max) {
