@@ -3,13 +3,26 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import h5py
-
+import argparse
+import json
 """
 this program creates two 3-D cylinders around the origin which are then shifted to their final positions.
 used for colliding cylinder testcase
 """
+
+parser = argparse.ArgumentParser(add_help=False)
+parser.add_argument("-d", "--dim", type=int, default=3, choices=[1, 2, 3], help="Simulation dimension")
+parser.add_argument("--delta", type=float, default=1.0e-1, help="Particle spacing")
+parser.add_argument("--velocity", type=float, default=0.059, help="Impactor velocity along impact direction")
+parser.add_argument("--output", "-o", default="./", help="Output folder")
+parser.add_argument("-v", "--verbose", type=int, default=3, help="Logging level")
+parser.add_argument("--pipeline", action="store_true")
+parser.add_argument("--dry", action="store_true", help="Run without saving files")
+args, _ = parser.parse_known_args()
+
+
 # Dim of cylinders
-dim = 3
+dim = args.dim
 
 # cylinder properties: inner and outer radius
 r_inner = 3.0
@@ -18,7 +31,8 @@ r_outer = 4.0
 width = 10  # width of cylinders will be width*delta_p
 
 # particle spacing
-delta_p = 0.1
+delta_p=args.delta
+# delta_p = 0.1
 # 0.1   --> 2 * 2.196 * width   = 4.392 *width  particles
 # 0.07  --> 2 * 4.488   = 8.976   particles
 # 0.05  --> 2 * 8.804   = 17.608  particles
@@ -41,7 +55,8 @@ shift = 5
 # shift = 4.2
 
 # projected speed
-v_p = 0.015 # 0.059
+v_p = args.velocity
+# v_p = 0.015 # 0.059
 
 density = 1
 
@@ -138,18 +153,49 @@ for i in range(1, NoRings):
 
 #h5f = h5py.File("rings_N{}-2D.h5".format(2*N), "w")
 #print("Saving to rings_N{}-2D.h5...".format(2*N))
-h5f = h5py.File("cyl_deltap{}width{}.h5".format(delta_p, NoRings), "w")
-print("Saving to cyl_deltap{}width{}.h5...".format(delta_p, NoRings))
+if not args.dry:
+    h5f = h5py.File("cyl_deltap{}width{}.h5".format(delta_p, NoRings), "w")
+    print("Saving to cyl_deltap{}width{}.h5...".format(delta_p, NoRings))
 
-# write to hdf5 data set
-h5f.create_dataset("x", data=r_rings)
-h5f.create_dataset("v", data=v_rings)
-h5f.create_dataset("m", data=m)
-h5f.create_dataset("materialId", data=materialId)
-h5f.create_dataset("rho", data=rho)
-#h5f.create_dataset("Sxx", data=Sxx)
-#h5f.create_dataset("Sxy", data=Sxy)
+    # write to hdf5 data set
+    h5f.create_dataset("x", data=r_rings)
+    h5f.create_dataset("v", data=v_rings)
+    h5f.create_dataset("m", data=m)
+    h5f.create_dataset("materialId", data=materialId)
+    h5f.create_dataset("rho", data=rho)
+    #h5f.create_dataset("Sxx", data=Sxx)
+    #h5f.create_dataset("Sxy", data=Sxy)
 
-h5f.close()
-print("Number of particles: ", 2*N*NoRings)
-print("Finished")
+    h5f.close()
+
+if args.pipeline:
+    if args.pipeline:
+        result = {
+            "header": [
+                "delta_particles",
+                "N_tot",
+                "N_ring",
+                "SML_estimate",
+                "SML_optimize",
+                "avg_distance_particles",
+                "avg_neighbors_optimized",
+                "delta_gap"
+            ],
+            "data": {
+                "delta_particles": f"{delta_p:.6e}",
+                "N_tot": f"{2*N*NoRings:.6e}",
+                "N_ring": f"{NoRings:.6e}",
+                "SML_estimate": f"{np.nan:.6e}",
+                "SML_optimize": f"{np.nan:.6e}",
+                "avg_distance_particles": f"{np.nan:.6e}",
+                "avg_neighbors_optimized": f"{np.nan:.6e}",
+                "delta_gap": f"{2*shift:.6e}"
+            }
+        }
+
+    # print("PIPELINE_JSON_START")
+    print(json.dumps(result))
+    # print("PIPELINE_JSON_END")
+else:
+    print("Number of particles:", 2*N*NoRings)
+    print("Finished")

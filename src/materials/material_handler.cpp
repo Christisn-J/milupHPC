@@ -159,10 +159,9 @@ MaterialHandler::MaterialHandler(const char *material_cfg) {
 #if PLASTICITY
         subset = config_setting_get_member(material, "plasticity");
         if (!subset) {
-            Logger(WARN) << "Missing 'plasticity' block for ID " << id;
+            Logger(ERROR) << "Missing 'plasticity' block for ID " << id;
         } else {
             lookupValue(subset, "yield_stress", &h_materials[id].plasticity.yield_stress, id, LookupMode::Required);
-
         }
 #endif
 

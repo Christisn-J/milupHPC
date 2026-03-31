@@ -2104,12 +2104,14 @@ real Miluphpc::parallel_gravity() {
     time = 0;
     //if (treeHandler->h_toDeleteLeaf[0] < treeHandler->h_toDeleteLeaf[1]) {
     // ---------------------------------------------------------
+    Logger(DEBUG) << "[rank " << subDomainKeyTreeHandler->h_subDomainKeyTree->rank <<"] before insertReceivedParticles: numNodes = "<< numNodes;
     time += Gravity::Kernel::Launch::insertReceivedParticles(subDomainKeyTreeHandler->d_subDomainKeyTree,
                                                              treeHandler->d_tree, particleHandler->d_particles,
                                                              domainListHandler->d_domainList,
                                                              lowestDomainListHandler->d_domainList,
                                                              numParticles, numParticles);
     // ---------------------------------------------------------
+    Logger(DEBUG) << "[rank " << subDomainKeyTreeHandler->h_subDomainKeyTree->rank <<"] after insertReceivedParticles: numNodes = "<< numNodes;
     //}
     totalTime += time;
     Logger(TIME) << "parallel_gravity: inserting received particles: " << time << " ms";
@@ -2799,12 +2801,14 @@ real Miluphpc::parallel_sph() {
 
     //if (treeHandler->h_toDeleteLeaf[1] > treeHandler->h_toDeleteLeaf[0]) {
     // -----------------------------------------------------------------------------------------------------------------
+    Logger(DEBUG) << "[rank " << subDomainKeyTreeHandler->h_subDomainKeyTree->rank <<"] before insertReceivedParticles: numNodes = "<< numNodes;
     time = SPH::Kernel::Launch::insertReceivedParticles(subDomainKeyTreeHandler->d_subDomainKeyTree,
                                                         treeHandler->d_tree,
                                                         particleHandler->d_particles, domainListHandler->d_domainList,
                                                         lowestDomainListHandler->d_domainList,
                                                         numParticles, numParticles);
     // -----------------------------------------------------------------------------------------------------------------
+    Logger(DEBUG) << "[rank " << subDomainKeyTreeHandler->h_subDomainKeyTree->rank <<"] after insertReceivedParticles: numNodes = "<< numNodes;
     //}
     profiler.value2file(ProfilerIds::Time::SPH::insertReceivedParticles, time);
 

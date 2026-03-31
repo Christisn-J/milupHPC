@@ -3,6 +3,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap, BoundaryNorm
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib
 import h5py
 import os, sys
@@ -11,177 +12,54 @@ import glob
 import logging
 import re
 
+import utility
+from constants import si_prefixes, FIELD_META
+from help import find_resource_files, read_material
+
+utility.setup_dynamic_plotStyle()
+utility.setup_global_latex()
+
 # Use non-interactive backend (for environments without display)
 matplotlib.use('Agg')
+plt.rcParams["agg.path.chunksize"] = 10000
+plt.rcParams["path.simplify"] = True
+plt.rcParams["path.simplify_threshold"] = 1.0
 
-# Metadata for each field: display name, LaTeX symbol, unit, and colormap
-FIELD_META = {
-    "x":        {"name": "Position",            "symbol": r"$|\vec{r}|$",     "unit": r"$\mathrm{m}$",                               "cmap": "gray"},
-    "a":        {"name": "Acceleration",        "symbol": r"$|\vec{a}|$",     "unit": r"$\frac{\mathrm{m}}{\mathrm{s}^2}$",          "cmap": "inferno"},
-    "m":        {"name": "Mass",                "symbol": r"$m$",             "unit": r"$\mathrm{kg}$",                              "cmap": "viridis"},
-    "v":        {"name": "Velocity",            "symbol": r"$|\vec{v}|$",     "unit": r"$\frac{\mathrm{m}}{\mathrm{s}}$",            "cmap": "plasma"},
-    "rho":      {"name": "Density",             "symbol": r"$\rho$",          "unit": r"$\frac{\mathrm{kg}}{\mathrm{m}^3}$",         "cmap": "viridis"},
-    "p":        {"name": "Pressure",            "symbol": r"$p$",             "unit": r"$\mathrm{Pa}$",                              "cmap": "plasma"},
-    "e":        {"name": "specific Energy",     "symbol": r"$\epsilon$",      "unit": r"$\mathrm{J}/\mathrm{kg}$",                   "cmap": "inferno"},
-    "E":        {"name": "Energy",              "symbol": r"$E",              "unit": r"$\mathrm{J}$",                               "cmap": "inferno"},
-    "cs":       {"name": "Speed of Sound",      "symbol": r"$c_s$",           "unit": r"$\frac{\mathrm{m}}{\mathrm{s}}$",            "cmap": "magma"},
-    "proc":     {"name": "Process",             "symbol": r"$\mathrm{proc}$", "unit": r"$-$",                                        "cmap": "tab20"},
-    "matId":     {"name": "Material ID",        "symbol": r"$\mathrm{matId}$","unit": r"$-$",                                        "cmap": "tab10"},
-    "sml":      {"name": "Smoothing Length",    "symbol": r"$h$",             "unit": r"$\mathrm{m}$",                               "cmap": "viridis"},
-    "noi":      {"name": "Number of Interactions","symbol": r"$\mathrm{noi}$","unit": r"$-$",                                        "cmap": "plasma"},
-    "Sxx":      {"name": "Stress XX",           "symbol": r"$\sigma_{xx}$",   "unit": r"$\mathrm{Pa}$",                              "cmap": "coolwarm"},
-    "Sxy":      {"name": "Stress XY",           "symbol": r"$\sigma_{xy}$",   "unit": r"$\mathrm{Pa}$",                              "cmap": "coolwarm"},
-    "Sxz":      {"name": "Stress XZ",           "symbol": r"$\sigma_{xz}$",   "unit": r"$\mathrm{Pa}$",                              "cmap": "coolwarm"},
-    "Syz":      {"name": "Stress YZ",           "symbol": r"$\sigma_{yz}$",   "unit": r"$\mathrm{Pa}$",                              "cmap": "coolwarm"},
-    "drhodt":   {"name": "Density Rate",        "symbol": r"$\frac{d\rho}{dt}$", "unit": r"$\frac{\mathrm{kg}}{\mathrm{m}^3\cdot\mathrm{s}}$", "cmap": "cividis"},
-    "dedt":   {"name": "specific Energy Rate","symbol": r"$\frac{d\epsilon}{dt}$", "unit": r"$\frac{\mathrm{J}}{\mathrm{kg}\cdot\mathrm{s}}$", "cmap": "cividis"},
-}
+reverse = True
 
-AXES_CONFIG = {
-    "x": {"limits": (-1, 1), "labels": f'x in [{FIELD_META["x"]["unit"]}]', "index": 0},
-    "y": {"limits": (-1, 1), "labels": f'y in [{FIELD_META["x"]["unit"]}]', "index": 1},
-    "z": {"limits": (-1, 1), "labels": f'z in [{FIELD_META["x"]["unit"]}]', "index": 2}
-}
+AXES_CONFIG = utility.AXES_CONFIG
+FRAME_PADDING = utility.FRAME_PADDING
+PLANES = utility.PLANES
+EXTENSION = utility.EXTENSION
+DTYPE = utility.EXTENSION
+SCALE = utility.SCALE
+DEFAULT_MARKER_ATTRS = utility.DEFAULT_MARKER_ATTRS
 
 # Predefined selections of keys for plotting
 SELECTS = {
-    0: {"name": "mechanics", "slug": "mechanics", "keys": ["m", "v", "E"]},
+    0: {"name": "mechanics", "slug": "mechanics", "keys": ["x", "m", "v", "E"]},
     1: {"name": "change rates", "slug": "change_rates", "keys": ["drhodt", "dedt", "a"]},
     2: {"name": "hydro", "slug": "hydro", "keys": ["rho", "p", "e", "cs"]},
     3: {"name": "process", "slug": "process", "keys": ["proc", "sml", "noi", "matId"]},
-    4: {"name": "stress", "slug": "stress", "keys": ["Sxx", "Sxy", "Sxz", "Syz"]}
+    4: {"name": "stress", "slug": "stress", "keys": ["Sxx", "Sxy", "Sxz", "Syz"]},
+    5: {"name": "velocity", "slug": "v", "keys": ["v"]},
+    6: {"name": "material id", "slug": "matId", "keys": ["matId"]},
+    7: {"name": "rho", "slug": "rho", "keys": ["rho"]},
+    8: {"name": "process", "slug": "proc", "keys": ["proc"]},
+    9: {"name": "number of interactions", "slug": "noi", "keys": ["noi"]},
+    10: {"name": "pressure", "slug": "p", "keys": ["p"]},
+    11: {"name": "specific energy", "slug": "e", "keys": ["e"]},
+    12: {"name": "speed of sound", "slug": "cs", "keys": ["cs"]}
 }
 
-FRAME_PADDING = 0.01
-PLANES = [("x", "y"), ("x", "z"), ("y", "z")]
-extension=".png"
 
-def dynamic_render_config(N):
-    """
-    Returns dynamic rendering parameters depending on number of particles N.
-    """
-    if N > 1e6:
-        alpha = 0.1
-        marker_size = 0.2
-        skip = max(1, int(N / 200_000))
-    elif N > 1e5:
-        alpha = 0.3
-        marker_size = 1.0
-        skip = max(1, int(N / 50_000))
-    else:
-        alpha = 0.8
-        marker_size = 1.0
-        skip = 1
-    return alpha, marker_size, skip
-def setup_logging(time=False):
-    """
-    Configures the logging format and level.
-    """
-    log_format = "%(asctime)s [%(levelname)s] %(message)s" if time else "[%(levelname)s] %(message)s"
-
-    logging.basicConfig(
-        format=log_format,
-        level=logging.INFO
-    )
-def setup_discrete_colormap(fig, ax, sc, data, base_cmap_name="tab10"):
-    """
-    Setzt für diskrete Daten eine passende Colormap und Colorbar mit ganzzahligen Ticks.
-
-    Args:
-        fig: Matplotlib Figure-Objekt
-        ax: Matplotlib Axes-Objekt
-        sc: Das Scatter-Plot-Objekt (aus ax.scatter)
-        data (np.ndarray): 1D-Array mit diskreten Werten (z.B. Material-IDs)
-        base_cmap_name (str): Basis-Colormap ("tab10" oder "tab20")
-
-    Returns:
-        cbar: Das Colorbar-Objekt
-    """
-    unique_vals = np.unique(data)
-    n_colors = len(unique_vals)
-
-    # Basis-Colormap wählen
-    if base_cmap_name == "tab10" and n_colors > 10:
-        base_cmap = plt.cm.tab20
-    else:
-        base_cmap = plt.get_cmap(base_cmap_name)
-
-    # Farbliste zuschneiden auf benötigte Anzahl Farben
-    colors = base_cmap.colors[:n_colors]
-    new_cmap = ListedColormap(colors)
-
-    # Norm für diskrete Bereiche
-    norm = BoundaryNorm(boundaries=np.arange(n_colors + 1) - 0.5, ncolors=n_colors)
-
-    # Setze Colormap und Norm im Scatterplot
-    sc.set_cmap(new_cmap)
-    sc.set_norm(norm)
-
-    # Colorbar mit ganzzahligen Ticks und passenden Labels
-    cbar = fig.colorbar(sc, ax=ax, ticks=np.arange(n_colors))
-    cbar.ax.set_yticklabels([str(int(v)) for v in unique_vals])
-    return cbar
-def get_global_extrema(file_list, key, is_vector=False):
-    """
-    Finds the global minimum and maximum values for a given key
-    across multiple HDF5 files.
-
-    Args:
-        file_list (list of str): List of HDF5 file paths
-        key (str): Dataset key to search in files
-        is_vector (bool): Whether the data is vector-valued (e.g. x, v)
-
-    Returns:
-        tuple: (mins, maxs), where each is a list for vector fields or a scalar for scalar fields
-    """
-    if is_vector:
-        ndim = None
-        mins = None
-        maxs = None
-    else:
-        global_min = np.inf
-        global_max = -np.inf
-
-    for h5file in file_list:
-        with h5py.File(h5file, 'r') as data_h5:
-            if key in data_h5:
-                arr = np.array(data_h5[key][:])
-                if is_vector:
-                    if ndim is None:
-                        ndim = arr.shape[1]
-                        mins = [np.inf] * ndim
-                        maxs = [-np.inf] * ndim
-                    for i in range(ndim):
-                        mins[i] = min(mins[i], np.min(arr[:, i]))
-                        maxs[i] = max(maxs[i], np.max(arr[:, i]))
-                else:
-                    global_min = min(global_min, np.min(arr))
-                    global_max = max(global_max, np.max(arr))
-    if is_vector:
-        return mins, maxs
-    else:
-        return global_min, global_max
-def slice_particles(coords, data, plane="xy", eps=0.005):
-    if plane == "xy":
-        mask = np.abs(coords[2]) < eps
-    elif plane == "xz":
-        mask = np.abs(coords[1]) < eps
-    elif plane == "yz":
-        mask = np.abs(coords[0]) < eps
-    else:
-        raise ValueError("Invalid plane: choose 'xy', 'xz', or 'yz'")
-
-    return tuple(coord[mask] for coord in coords), [d[mask] if d is not None else None for d in data]
 def plot_2D_slice(planes, coords, data, filename=None, title=None, delta=1e-2, **kwargs):
     logging.info(f"Plotting 2D slice {planes}")
     for ax1, ax2 in planes:
-
-        i1 = AXES_CONFIG[ax1]["index"]
-        i2 = AXES_CONFIG[ax2]["index"]
         plane_name = f"{ax1}{ax2}"
 
-        sliced_coords, sliced_data = slice_particles(coords, data, plane=plane_name, eps=delta)
-        coords_plane = (sliced_coords[i1], sliced_coords[i2])
+        sliced_coords, sliced_data = utility.slice_particles(coords, data, plane=plane_name, eps=delta)
+        coords_plane = (sliced_coords[AXES_CONFIG[ax1]["index"]], sliced_coords[AXES_CONFIG[ax2]["index"]])
 
         if plane_name == "xy":
             ax3 = "z"
@@ -195,26 +73,29 @@ def plot_2D_slice(planes, coords, data, filename=None, title=None, delta=1e-2, *
         plot_2D_scatter(
             coords=coords_plane,  # extract plane
             datas=sliced_data,
-            title=f"{title} | Plane {plane_name} thickness: |{ax3} <= {delta:.3e}|",
+            title=utility.format_math_text(rf"{title} | Plane {plane_name} | $\Delta_{{{ax3}}} \le {delta:.3e}$"),
             filename=f"{filename}_slice_{plane_name}",
             **kwargs
         )
+
+
 def plot_2D_projection(planes, coords, data, filename=None, title=None, **kwargs):
     logging.info(f"Plotting 2D projection {planes}")
     for ax1, ax2 in planes:
-        i1 = AXES_CONFIG[ax1]["index"]
-        i2 = AXES_CONFIG[ax2]["index"]
-        coords_plane = (coords[i1], coords[i2])
+        coords_plane = (coords[AXES_CONFIG[ax1]["index"]], coords[AXES_CONFIG[ax2]["index"]])
         plane_name = f"{ax1}{ax2}"
 
         plot_2D_scatter(
             coords_plane,
             data,
-            title=f"{title} | Plane {plane_name}",
+            title=utility.format_math_text(f"{title} | Plane {plane_name}"),
             filename=f"{filename}_projection_{plane_name}",
             **kwargs
         )
-def plot_3D_scatter(coords, datas, filename=None, labels=None, title=None, cmaps=["viridis"], dpi=300, point_size=0.5, axis_config=AXES_CONFIG, vmin=None, vmax=None, alpha=0.8):
+
+
+def plot_3D_scatter(coords, datas, filename=None, labels=None, keys=None, title=None, cmaps=["viridis"], dpi=300, axis_config=AXES_CONFIG, vmin=None, vmax=None, marker_atts=DEFAULT_MARKER_ATTRS,
+                    material_atts=None, note=None, extension=None):
     """
     Creates a 3D scatter plot for one or more scalar fields.
 
@@ -232,14 +113,16 @@ def plot_3D_scatter(coords, datas, filename=None, labels=None, title=None, cmaps
     """
     logging.info(f"Plotting 3D scatter")
     n = len(datas)
-    fig, axs = plt.subplots(1, n, subplot_kw={'projection': '3d'}, figsize=(6 * n, 6), dpi=dpi)
+    utility.setup_dynamic_plotStyle(n=n, dim=3)
+
+    fig, axs = plt.subplots(1, n, subplot_kw={'projection': '3d'}, figsize=plt.rcParams["figure.figsize"], dpi=dpi)
 
     # Make sure axs is iterable even for n=1
     if n == 1:
         axs = [axs]
 
     for i, ax in enumerate(axs):
-        label = labels[i] if labels else f"Data {i}"
+        label = utility.format_math_text(labels[i]) if labels else f"Data {i}"
         data = datas[i]
         cmap = cmaps[i] if i < len(cmaps) else "viridis"
 
@@ -254,35 +137,68 @@ def plot_3D_scatter(coords, datas, filename=None, labels=None, title=None, cmaps
             cmap=cmap,
             vmin=vmin[i] if vmin else None,
             vmax=vmax[i] if vmax else None,
-            s=point_size,
-            alpha=alpha
+
+            s=marker_atts["s"],
+            alpha=marker_atts["alpha"],
+            rasterized=marker_atts["rasterized"],
+            linewidths=marker_atts["linewidths"],
+            marker=marker_atts["marker"]
         )
+        # --- View-Winkel setzen ---
+        ax.view_init(elev=30, azim=-60)
+
+        # --- Z-Achse nach links verschieben ---
+        ax.zaxis._axinfo["juggled"] = (1, 2, 0)
+
+        ax.set_box_aspect([1, 1, 1])
+
         ax.set_xlim(*axis_config["x"]["limits"])
         ax.set_ylim(*axis_config["y"]["limits"])
         ax.set_zlim(*axis_config["z"]["limits"])
 
-        ax.set_xlabel(axis_config["x"]["labels"])
-        ax.set_ylabel(axis_config["y"]["labels"])
-        ax.set_zlabel(axis_config["z"]["labels"])
+        ax.set_xlabel(utility.format_math_text(axis_config["x"]["labels"]), fontsize=plt.rcParams["axes.labelsize"], labelpad=15)
+        ax.set_ylabel(utility.format_math_text(axis_config["y"]["labels"]), fontsize=plt.rcParams["axes.labelsize"], labelpad=15)
+        ax.set_zlabel(utility.format_math_text(axis_config["z"]["labels"]), fontsize=plt.rcParams["axes.labelsize"], labelpad=15)
 
         # Try to extract label content inside parentheses for colorbar label
         match = re.search(r'\((.*?)\)', label)
+        plt.rcParams.update({
+            "xtick.minor.visible": True,
+            "ytick.minor.visible": True
+        })
         cbar_label = match.group(1) if match else label
 
         if cmap == "tab10" or (isinstance(cmap, str) and cmap.startswith("tab")):
-            cbar = setup_discrete_colormap(fig, ax, sc, data, base_cmap_name=cmap)
+            if keys[i] == 'matId':
+                cbar = utility.setup_discrete_colormap(fig, ax, sc, data, base_cmap_name=cmap, material_names=material_atts)
+            else:
+                cbar = utility.setup_discrete_colormap(fig, ax, sc, data, base_cmap_name=cmap)
+
         else:
-            cbar = fig.colorbar(sc, ax=ax)
+            cbar = fig.colorbar(sc, ax=ax, pad=0.05)
+
         cbar.set_label(cbar_label)
-        ax.set_title(label)
+        utility.style_colorbar(cbar, n=n, dim=3)
+        ax.set_title(utility.format_math_text(label), fontsize=plt.rcParams["axes.titlesize"])
 
     if title is not None:
-        fig.suptitle(title)
+        if n==1:
+            fig.suptitle(utility.format_math_text(title), fontsize=plt.rcParams["figure.titlesize"])
+        else:
+            fig.suptitle(utility.format_math_text(title), fontsize=plt.rcParams["figure.titlesize"], y=1.0)
+
+    # --- Optionale Fußnote unter dem Plot ---
+    if note:
+        fig.text(0.5, 0.01, note, ha="center", va="bottom")
 
     plt.tight_layout()
-    plt.savefig(f"{filename}{extension}", bbox_inches='tight')
+    for e in extension:
+        plt.savefig(f"{filename}.{e}", dpi=dpi, bbox_inches='tight', pad_inches=0.5)
     plt.close(fig)
-def plot_2D_scatter(coords, datas, filename=None, labels=None, title=None, cmaps=["viridis"], dpi=300, point_size=0.5, axis_config=AXES_CONFIG, vmin=None, vmax=None, alpha=0.8):
+
+
+def plot_2D_scatter(coords, datas, filename=None, labels=None, keys=None, title=None, cmaps=["viridis"], axis_config=AXES_CONFIG, vmin=None, vmax=None, dpi=300, marker_atts=DEFAULT_MARKER_ATTRS,
+                    material_atts=None, note=None, extension=None):
     """
     Creates a 2D scatter plot for one or more scalar fields.
 
@@ -304,7 +220,9 @@ def plot_2D_scatter(coords, datas, filename=None, labels=None, title=None, cmaps
         logging.info(f"Plotting 2D scatter")
 
     n = len(datas)
-    fig, axs = plt.subplots(1, n, figsize=(6 * n, 6), dpi=dpi)
+    utility.setup_dynamic_plotStyle(n=n, dim=2)
+
+    fig, axs = plt.subplots(1, n, figsize=plt.rcParams["figure.figsize"], dpi=dpi)
 
     # Ensure axs is iterable
     if n == 1:
@@ -312,7 +230,7 @@ def plot_2D_scatter(coords, datas, filename=None, labels=None, title=None, cmaps
 
     for i, (ax, data, label, cmap) in enumerate(zip(axs, datas, labels, cmaps)):
         if data is None:
-            ax.text(0.5, 0.5, f"No data for {label}", ha='center', va='center')
+            ax.text(0.5, 0.5, utility.format_math_text(f"No data for {label}"), ha='center', va='center')
             ax.set_axis_off()
             continue
 
@@ -320,35 +238,57 @@ def plot_2D_scatter(coords, datas, filename=None, labels=None, title=None, cmaps
             coords[0], coords[1],
             c=data,
             cmap=cmap,
-            s=point_size,
             vmin=vmin[i] if vmin else None,
             vmax=vmax[i] if vmax else None,
-            alpha=alpha
+
+            s=marker_atts["s"],
+            alpha=marker_atts["alpha"],
+            rasterized=marker_atts["rasterized"],
+            linewidths=marker_atts["linewidths"],
+            marker=marker_atts["marker"]
         )
 
         ax.set_xlim(*axis_config["x"]["limits"])
         ax.set_ylim(*axis_config["y"]["limits"])
 
-        ax.set_xlabel(axis_config["x"]["labels"])
-        ax.set_ylabel(axis_config["y"]["labels"])
+        # --- ACHSENVERHÄLTNIS FESTLEGEN ---
+        ax.set_aspect('equal', adjustable='box')
+
+        ax.set_xlabel(utility.format_math_text(axis_config["x"]["labels"]), fontsize=plt.rcParams["axes.labelsize"], labelpad=15)
+        ax.set_ylabel(utility.format_math_text(axis_config["y"]["labels"]), fontsize=plt.rcParams["axes.labelsize"], labelpad=15)
 
         # Try to extract label content inside parentheses for colorbar label
         match = re.search(r'\((.*?)\)', label)
+        plt.rcParams.update({
+            "xtick.minor.visible": True,
+            "ytick.minor.visible": True
+        })
         cbar_label = match.group(1) if match else label
 
         if cmap == "tab10" or (isinstance(cmap, str) and cmap.startswith("tab")):
-            cbar = setup_discrete_colormap(fig, ax, sc, data, base_cmap_name=cmap)
+            if keys[i] == 'matId':
+                cbar = utility.setup_discrete_colormap(fig, ax, sc, data, base_cmap_name=cmap, material_names=material_atts)
+            else:
+                cbar = utility.setup_discrete_colormap(fig, ax, sc, data, base_cmap_name=cmap)
         else:
             cbar = fig.colorbar(sc, ax=ax)
         cbar.set_label(cbar_label)
-        ax.set_title(label)
+        utility.style_colorbar(cbar, n=n)
+        ax.set_title(utility.format_math_text(label), fontsize=plt.rcParams["axes.titlesize"])
 
     if title is not None:
-        fig.suptitle(title)
+        fig.suptitle(utility.format_math_text(title), fontsize=plt.rcParams["figure.titlesize"])#, y=1.02)
+
+    # --- Optionale Fußnote unter dem Plot ---
+    if note:
+        fig.text(0.5, 0.01, note, ha="center", va="bottom")
 
     plt.tight_layout()
-    plt.savefig(f"{filename}{extension}", bbox_inches='tight')
+    for e in extension:
+        plt.savefig(f"{filename}.{e}", dpi=dpi, bbox_inches='tight', pad_inches=0.2)
     plt.close(fig)
+
+
 def main(args):
     """
     Main function to process input files and generate plots.
@@ -359,31 +299,37 @@ def main(args):
     # Determine keys to plot based on user input
     if args.key:
         keys = args.key
-    elif args.plot_type is not None:
-        keys = SELECTS[args.plot_type]["keys"]
+        slug = "_".join(keys)
+    elif args.plotType is not None:
+        keys = SELECTS[args.plotType]["keys"]
+        slug = SELECTS[args.plotType]['slug']
     else:
-        logging.error("You must specify either --plot_type or --key.")
+        logging.error("You must specify either --plotType or --key.")
         return
 
     # Create output directory if it does not exist
     os.makedirs(args.output, exist_ok=True)
 
     # Find and sort HDF5 files in the input directory
-    file_list = sorted(glob.glob(os.path.join(args.data, "*.h5")), key=os.path.basename)
+    file_list = sorted(glob.glob(os.path.join(args.data, f"*{EXTENSION['H5']}")), key=os.path.basename, reverse=reverse)
 
     # Automatically adjust AXES_CONFIG based on global x min/max
     logging.info("Computing global extrema for 'x' to adjust axis limits...")
-    x_mins, x_maxs = get_global_extrema(file_list, "x", is_vector=True)
+    x_mins, x_maxs = utility.get_global_extrema(file_list, "x", is_vector=True)
     logging.info(file_list)
 
-    for i, label in zip(range(args.dim), AXES_CONFIG.keys()):
+    for i, axis in zip(range(args.dim), AXES_CONFIG.keys()):
         if i < len(x_mins) and i < len(x_maxs):
-            logging.info(f"'{label}' {x_mins} {x_maxs}")
-            AXES_CONFIG[label]["limits"] = (x_mins[i] - FRAME_PADDING, x_maxs[i] + FRAME_PADDING)
-            logging.info(f"Updated axis '{label}' limits: {AXES_CONFIG[label]['limits']}")
-        else:
-            logging.warning(f"Skipping axis '{label}' due to insufficient extrema data.")
+            logging.info(f"'{axis}' {x_mins} {x_maxs}")
 
+            AXES_CONFIG[axis]["limits"] = ((x_mins[i] - FRAME_PADDING) / si_prefixes[args.scale["x"]]["factor"], (x_maxs[i] + FRAME_PADDING) / si_prefixes[args.scale["x"]]["factor"])
+            logging.info(f"Updated axis '{axis}' limits: {AXES_CONFIG[axis]['limits']}")
+
+            AXES_CONFIG[axis]['labels'] = utility.format_math_text(f'${axis}$ [${si_prefixes[args.scale["x"]]["abbr"]}{FIELD_META["x"]["unit"].strip("$")}$]')
+            logging.info(f"Updated axis '{axis}' labels: {AXES_CONFIG[axis]['labels']}")
+
+        else:
+            logging.warning(f"Skipping axis '{axis}' due to insufficient extrema data.")
 
     if args.slice:
         # Compute average data extent (range) for slice delta
@@ -391,8 +337,7 @@ def main(args):
         logging.info(f"Extents: {extents}")
         avg_extent = np.mean(extents)
         thickness = 0.01 * avg_extent  # e.g. 1% of average range
-        logging.info(f"Using slice delta (thickness): {thickness:.5g}")
-
+        logging.info(f"Using slice Δ = {thickness:.5g}")
 
     # If requested, compute global extrema for color normalization
     if args.extrema:
@@ -401,12 +346,28 @@ def main(args):
 
         for key in keys:
             if key != "noi":  # Skip 'noi' as it may be categorical
-                vmin, vmax = get_global_extrema(file_list, key)
+                vmin, vmax = utility.get_global_extrema(file_list, key)
                 logging.info(f"Global min/max for '{key}': {vmin} / {vmax}")
                 vmins[key], vmaxs[key] = vmin, vmax
 
+    if args.config:
+        t_0 = float(utility.read_from_file(args.config, "t_0", fallback=0.0))
+        t_end = float(utility.read_from_file(args.config, "timeEnd", fallback=0.0))
+        if args.resource:
+            steps = int(utility.read_from_file(args.resource, "NSTEPs", fallback=None))
+        else:
+            steps = len(file_list)
+
+        delta_t = t_end / steps  # oder aus Resource-Datei lesen
+        time = np.linspace(t_0 + delta_t, t_end, steps) / si_prefixes[args.scale["t"]]["factor"]
+
     # Loop over files and generate plots
-    for i, h5file in enumerate(file_list):
+    for idx, h5file in enumerate(file_list):
+        if reverse:
+            i = len(file_list) - idx - 1
+        else:
+            i = idx
+
         logging.info(f"Plotting timestep {i}")
         logging.info(f"Processing file: {h5file}")
 
@@ -414,7 +375,7 @@ def main(args):
             # Load positions (required for all plots)
             key = "x"
             if key in data_h5:
-                positions = np.array(data_h5[key][:])
+                positions = np.array(data_h5[key][:]) / si_prefixes[args.scale["x"]]["factor"]
                 logging.info(f"Loaded '{key}' with shape {positions.shape}")
             else:
                 logging.error(f"Key '/{key}' not found in file {h5file}")
@@ -439,36 +400,50 @@ def main(args):
                     data_select[key] = None  # Mark missing data as None
 
         # Set output filename and extension
-        filename = f"ts{i:06d}_{SELECTS[args.plot_type]['slug']}"
-        title = f"Timestep {i}"
+        filename = f"ts{i:06d}_{slug}"
+        if args.config and i <= len(time):
+            title = utility.format_math_text(
+                rf"Time: $N_{{\mathrm{{snap}}}}={i:06d}$, $t={time[i]:.3f}$ ${si_prefixes[args.scale['t']]['abbr']}{FIELD_META['t']['unit'].strip('$')}$"
+                "\n"
+                rf"Particles: $N_{{\mathrm{{par, tot}}}}={positions.shape[0]:0.3e}$"
+            )
+        else:
+            title = utility.format_math_text(
+                rf"Time: $N_{{\mathrm{{snap}}}} = {i:06d}$"
+                "\n"
+                rf"Particles: $N_{{\mathrm{{par, tot}}}} = {positions.shape[0]:0.3e}$"
+            )
+
         data = [data_select.get(key) for key in keys]
         cmaps = [FIELD_META[key]["cmap"] for key in keys]
-        labels = [f'{FIELD_META[key]["name"]} ({FIELD_META[key]["symbol"]} in [{FIELD_META[key]["unit"]}])' for key in keys]
-        extremes = {
-            "min": [vmins.get(key) if args.extrema else None for key in keys],
-            "max": [vmaxs.get(key) if args.extrema else None for key in keys]
-        }
+        labels = [utility.format_math_text(f'{FIELD_META[key]["name"]} ({FIELD_META[key]["symbol"]} [{FIELD_META[key]["unit"]}])') for key in keys]
+        extremes = {"min": [vmins.get(key) if args.extrema else None for key in keys], "max": [vmaxs.get(key) if args.extrema else None for key in keys]}
 
-        N = positions.shape[0]
-        alpha, marker_size, skip = dynamic_render_config(N)
         if args.dynamicRender:
-            logging.info(f"Dynamic rendering enabled for N={N}: alpha={alpha}, marker_size={marker_size}, skip={skip}")
-            positions = positions[::skip]
+            marker_atts = utility.dynamic_render_config(positions.shape[0], args.dim)
+            logging.info(f"Dynamic rendering enabled for N={positions.shape[0]}: {marker_atts}")
+            positions = positions[::marker_atts["skip"]]
             for key, data_array in data_select.items():
                 if data_array is not None:
-                    data_select[key] = data_array[::skip]
+                    data_select[key] = data_array[::marker_atts["skip"]]
         else:
-            logging.info(f"Dynamic rendering disabled; using full data with N={N}")
+            logging.info(f"Dynamic rendering disabled; using full data with N={positions.shape[0]}")
+            marker_atts = DEFAULT_MARKER_ATTRS
+
+        material_atts = None
+        if args.material:
+            materials = read_material(args.material)
+            material_atts = {int(m["ID"]): m["name"] for m in materials if "ID" in m and "name" in m}
 
         # Plot in 3D or 2D based on argument
         if args.dim == 3:
             coords = (positions[:, 0], positions[:, 1], positions[:, 2])
             funk = plot_3D_scatter
-            planes=PLANES
+            planes = PLANES
         elif args.dim == 2:
             coords = (positions[:, 0], positions[:, 1], np.zeros_like(positions[:, 1]))
-            funk=plot_2D_scatter
-            planes=[PLANES[0]]
+            funk = plot_2D_scatter
+            planes = [PLANES[0]]
         else:
             continue
 
@@ -476,13 +451,16 @@ def main(args):
             coords,
             data,
             labels=labels,
+            keys=keys,
             title=title,
             cmaps=cmaps,
             vmin=extremes["min"],
             vmax=extremes["max"],
             filename=os.path.join(args.output, f"{filename}"),
-            point_size=marker_size,
-            alpha=alpha
+            marker_atts=marker_atts,
+            material_atts=material_atts,
+            dpi=args.dpi,
+            extension=args.extension
         )
 
         # --- Projektionen in 2D (für 3D-Daten) ---
@@ -492,13 +470,16 @@ def main(args):
                 coords,
                 data,
                 labels=labels,
+                keys=keys,
                 title=title,
                 cmaps=cmaps,
                 vmin=extremes["min"],
                 vmax=extremes["max"],
                 filename=os.path.join(args.output, f"{filename}"),
-                point_size=marker_size,
-                alpha=alpha
+                marker_atts=marker_atts,
+                material_atts=material_atts,
+                dpi=args.dpi,
+                extension=args.extension
             )
         # --- Slices in 2D (für 3D-Daten) ---
         if args.slice:
@@ -508,32 +489,44 @@ def main(args):
                 data,
                 delta=thickness,
                 labels=labels,
+                keys=keys,
                 title=title,
                 cmaps=cmaps,
                 vmin=extremes["min"],
                 vmax=extremes["max"],
                 filename=os.path.join(args.output, f"{filename}"),
-                point_size=marker_size,
-                alpha=alpha
+                marker_atts=marker_atts,
+                material_atts=material_atts,
+                dpi=args.dpi,
+                extension=args.extension
             )
 
         logging.info(f"Saved plot to {args.output}")
 
+
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="2D/3D plotting tool for particle data from HDF5 files.")
-    parser.add_argument("--data", "-d", type=str, default="output", help="Input directory containing HDF5 files.")
-    parser.add_argument("--output", "-o", type=str, default="output", help="Output directory for saving plots.")
-    parser.add_argument("--plot_type", "-p", type=int, choices=range(len(SELECTS.keys())), help=f"Plot type selection: {SELECTS[0]['name']}; [1]: {SELECTS[1]['name']}; [2]: {SELECTS[2]['name']}; [3]: {SELECTS[3]['name']}; [4]: {SELECTS[4]['name']}.")
-    parser.add_argument("--key", "-k", type=str, nargs='+', help="List of keys to plot (overrides --plot_type).")
-    parser.add_argument("--dim", "-D", type=int, choices=[2, 3], default=3, help="Problem dimensionality (default: 3).")
+    parser.add_argument("--data", "-p", type=str, default="output/timestep/", help="Input directory containing HDF5 files.")
+    parser.add_argument("--config", "-c", type=str, default=None, help="Config file")
+    parser.add_argument("--resource", "-r", type=str, default=None, help="Resource file")
+    parser.add_argument("--material", "-m", type=str, default=None, help="Material file")
+    parser.add_argument("--output", "-o", type=str, default="output/visualized/", help="Output directory for saving plots.")
+    parser.add_argument("--verbose", "-v", type=int, choices=[1, 2, 3], default=3, help="Enable verbose output")
+    parser.add_argument("--dim", "-d", type=int, choices=[2, 3], default=3, help="Problem dimensionality (default: 3).")
     parser.add_argument("--extrema", "-e", action='store_true', help="Enable global extrema computation for color scaling.")
+    parser.add_argument("--dynamicRender", "-dR", action="store_true", help="Enable dynamic rendering, skipping points for better performance.")
     parser.add_argument("--slice", action='store_true', help="Enable 2D slices through coordinate planes.")
     parser.add_argument("--projection", action='store_true', help="Enable 2D projection plots onto coordinate planes.")
-    parser.add_argument("--dynamicRender", action="store_true", help="Enable dynamic rendering, skipping points for better performance.")
-    parser.add_argument("-v", "--verbose", type=int, choices=[1, 2, 3], default=3,help="Enable verbose output")
+    parser.add_argument("--select", "-s", type=int, nargs='+', help="List of particle IDs to highlight")
+    parser.add_argument("--scale", nargs="+", default=[], metavar="axis=factor", help="Scaling for axes, e.g. --scale x=centi t=kilo")
+    parser.add_argument("--key", "-k", type=str, nargs='+', help="List of keys to plot (overrides --plotType).")
+    parser.add_argument("--plotType", "-pT", type=int, choices=SELECTS.keys(), help="Plot type selection: " + "; ".join(f"[{k}]: {SELECTS[k]['name']}" for k in sorted(SELECTS)))
+    parser.add_argument("--dpi", type=int, default=300, help="Set DPI for all output plots (default: 300).")
+    parser.add_argument("--extension", nargs="+", default=["png"], choices=["png", "pdf", "svg", "jpg"], help="Output file formats (default: png). Example: -e png pdf svg")
 
     args = parser.parse_args()
+    args.extension=["png", "pdf"]
     # Set logging level based on verbosity flag
     if args.verbose >= 3:
         log_level = logging.DEBUG
@@ -542,16 +535,54 @@ if __name__ == "__main__":
     else:
         log_level = logging.WARNING
 
-    logging.basicConfig(
-        level=log_level,
-        format='[%(levelname)s] %(message)s',
-        handlers=[logging.StreamHandler(sys.stdout)]
-    )
+    utility.setup_logging()
+    # logging.basicConfig(
+    #     level=log_level,
+    #     format='[%(levelname)s] %(message)s',
+    #     handlers=[logging.StreamHandler(sys.stdout)]
+    # )
 
-    if args.plot_type not in range(len(SELECTS.keys())) and not args.key:
+    base = os.path.abspath(args.data)
+    configured_path = os.path.join(base, "configured")
+
+    # --- config ---
+    if args.config is None:
+        args.config = sorted([os.path.join(configured_path, f) for f in os.listdir(configured_path) if f.endswith(".info")])[0]
+
+    # --- material ---
+    if args.material is None:
+        args.material = sorted([os.path.join(configured_path, f) for f in os.listdir(configured_path) if f.endswith(".cfg")])[0]
+
+    # --- resource ---
+    if args.resource is None:
+        args.resource = sorted([os.path.join(configured_path, f) for f in os.listdir(configured_path) if f.endswith(".res")])[0]
+
+    # --------------------------------------------------
+    # logging
+    # --------------------------------------------------
+    logging.info(f"Using config:   {args.config or 'None'}")
+    logging.info(f"Using material:{args.material or 'None'}")
+    logging.info(f"Using resource:{args.resource or 'None'}")
+
+    for item in args.scale:
+        if "=" not in item:
+            raise ValueError(f"Invalid scale format '{item}', expected axis=factor")
+
+        axis, factor = item.split("=", 1)
+
+        if axis not in SCALE:
+            raise ValueError(f"Unknown scale axis '{axis}', allowed: {list(SCALE.keys())}")
+
+        if factor not in si_prefixes:
+            raise ValueError(
+                f"Unknown scale factor '{factor}', allowed: {list(si_prefixes.keys())}"
+            )
+
+        SCALE[axis] = factor
+    args.scale = SCALE
+
+    if args.plotType not in SELECTS and not args.key:
         parser.print_help()
         exit(1)
 
     main(args)
-
-

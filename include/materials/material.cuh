@@ -308,6 +308,7 @@ struct EqOfSt {
               rho_limit(ValueSelector<mode, real>::value()),
               cs_limit(ValueSelector<mode, real>::value()) {};
 };
+
 /**
  * @brief Material parameters class.
  *

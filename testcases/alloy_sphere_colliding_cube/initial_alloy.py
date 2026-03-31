@@ -1,509 +1,580 @@
 #!/usr/bin/env python3
+# ==================================================================================================
+# Particle Simulation Script
+#
+# Description:
+# This script initializes a particle system for simulations of colliding targets and impactors.
+# Supports cube and sphere geometries via a SHAPES registry. Particles are generated based
+# on the chosen geometry, mass, density, and spacing Δ.
+#
+# Features:
+# - Cube and Sphere particle generators
+# - Explicit velocity input for impactor
+# - Neighbor statistics for SPH smoothing length estimation
+# - Optional runtime optimization to skip sanity checks
+# - Full 2D/3D visualization with scatter plots and slices
+# - Saves initial particle state to HDF5
+#
+# Empirical Reference Table for Particle Resolution and Initial Separation:
+# ------------------------------------------------------------------------
+# The following table shows empirically determined grid spacing Δ, smoothing
+# length h, and initial target-impactor gap d_gap for different total particle
+# counts N in 2D and 3D simulations. The initial gap is chosen proportional
+# to the particle spacing Δ to ensure that the smoothing length h is smaller
+# than the separation distance.
+#
+#  +--------+----------------------+--------------------+----------------------+--------------------+--------------------+----------------------+
+#  |        |        2D            |                    |                      |          3D        |                    |                      |
+#  |  N     | Δ [m]                | h [m]              | d_gap = 5Δ [m]       | Δ [m]              | h [m]              | d_gap = 2.5Δ [m]    |
+#  +--------+----------------------+--------------------+----------------------+--------------------+--------------------+----------------------+
+#  | 1e4    | 1.0e-3               | 3.49e-3            | 5.0e-3               | 4.0e-3             | 9.10e-3            | 1.0e-2               |
+#  | 1e5    | 3.0e-4               | 1.05e-3            | 1.5e-3               | 2.0e-3             | 4.55e-3            | 5.0e-3               |
+#  | 1e6    | 1.0e-4               | 3.49e-4            | 5.0e-4               | 1.0e-3             | 2.28e-3            | 2.5e-3               |
+#  | 1e7    | 3.0e-5               | 1.05e-4            | 1.5e-4               | 4.0e-4             | 9.10e-4            | 1.0e-3               |
+#  | 1e8    | 1.0e-5               | 1.30e-5            | 5.0e-5               | 2.0e-4             | 2.60e-4            | 5.0e-4               |
+# ------------------------------------------------------------------------
+#
+# Notes:
+# - Δ defines particle spacing in each dimension.
+# - h is the suggested smoothing length based on neighbor statistics.
+# - d_gap sets the initial separation between target and impactor.
+# - Values are empirical and may require adjustment based on simulation needs.
+# ==================================================================================================
+
 import sys, os
 import numpy as np
+import json
 import logging
-logging.getLogger('matplotlib').setLevel(logging.WARNING)
 import h5py
+import resource
 import argparse
 from datetime import datetime
 from scipy.spatial import cKDTree
-import resource
 
+# Suppress matplotlib debug logs
+logging.getLogger('matplotlib').setLevel(logging.WARNING)
+
+# --------------------------------------------------------------------------------------------------
+# Local imports
+# --------------------------------------------------------------------------------------------------
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../postprocessing")))
 import plotScatter
 
-# Konstanten ===================================================================================================
-OPTIMIZE_COMPUTATION=True
-DTYPE = 32  # oder 64
-FIELD_META = plotScatter.FIELD_META
-TYPE = {"float": np.float32 if DTYPE == 32 else np.float64, "int": np.int32 if DTYPE == 32 else np.int64}
-AXES_CONFIG = plotScatter.AXES_CONFIG
-FRAME_PADDING = plotScatter.FRAME_PADDING
-PLANES = plotScatter.PLANES
-EXTENSION={"plot": ".png", "data": ".h5"}
-ETA = 1.3
-NEIGHBORS = (30, 180)
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../constants")))
+import constants
 
-# === Material definitions ===
-MATERIALS = {
-    "AL6061": {"density": 2700.0, "unit": "kg/m³", "name": "Aluminum 6061"},
-    "STEEL": {"density": 7850.0, "unit": "kg/m³", "name": "Steel"},
-    "COPPER": {"density": 8960.0, "unit": "kg/m³", "name": "Copper"},
-    "ICE": {"density": 917.0, "unit": "kg/m³", "name": "Ice"},
-    "BASALT": {"density": 917.0, "unit": "kg/m³", "name": "Basalt"},
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../utility")))
+import utility
+
+from constants import si_prefixes
+
+utility.setup_global_latex()
+
+# ==================================================================================================
+# Logging-Level "EXTRA" definieren (zwischen DEBUG=10 und INFO=20)
+# ==================================================================================================
+EXTRA_LEVEL_NUM = 15
+logging.addLevelName(EXTRA_LEVEL_NUM, "EXTRA")
+
+
+def extra(self, message, *args, **kws):
+    """Log message at EXTRA level."""
+    if self.isEnabledFor(EXTRA_LEVEL_NUM):
+        self._log(EXTRA_LEVEL_NUM, message, args, **kws)
+
+
+# Methode allen Loggern hinzufügen
+logging.Logger.extra = extra
+
+
+# Modulweite Funktion ermöglichen: logging.extra(...)
+def _logging_extra(message, *args, **kws):
+    logging.getLogger().extra(message, *args, **kws)
+
+
+logging.extra = _logging_extra
+
+# ==================================================================================================
+# Global configuration
+# ==================================================================================================
+ETA = 1.3  # Scaling factor for smoothing length estimate
+NEIGHBORS = (30, 180)  # target neighbor range for smoothing length search
+GAP = {0: None, 1: 10, 2: 5, 3: 2.5}  # Initial gap multipliers based on dimension
+
+FIELD_META = constants.FIELD_META
+MATERIALS = constants.MATERIALS
+AXES_CONFIG = utility.AXES_CONFIG
+FRAME_PADDING = utility.FRAME_PADDING
+PLANES = utility.PLANES
+SCALE = utility.SCALE
+EXTENSION = utility.EXTENSION
+DTYPE = utility.DTYPE
+
+# ==================================================================================================
+# SHAPE REGISTRY
+# Maps shape names to generation functions and geometric properties
+# ==================================================================================================
+SHAPES = {
+    "cube": {
+        "center": lambda o: o["center"],
+        "volume": lambda o, dim: (2 * o["extent_max"]) ** dim,
+        "generate": lambda o, **kw: generate_cube_particles(
+            o["extent_max"],
+            o["speed"],
+            o["mass"],
+            o["id"],
+            o["material"]["density"],
+            center=o["center"],
+            **kw
+        ),
+    },
+    "sphere": {
+        "center": lambda o: o["center"],
+        "volume": lambda o, dim: (
+            (4 / 3 * np.pi * o["extent_max"] ** 3) if dim == 3
+            else (np.pi * o["extent_max"] ** 2) if dim == 2
+            else (2 * o["extent_max"])
+        ),
+        "generate": lambda o, **kw: generate_sphere_particles(
+            o["extent_max"],
+            o["speed"],
+            o["mass"],
+            o["id"],
+            o["material"]["density"],
+            center=o["center"],
+            **kw
+        ),
+    },
 }
 
-TARGET=  {"id":0, "shape": "cube",   "name": "Target",   "particles": None, "speed": [0,0,0], "material": MATERIALS["AL6061"], "mass": None, "volume": None, "cube": {"length": 5.0e-2, "center": None}, "sphere": {"radius": None, "center": None}}
-IMPACTOR={"id":1, "shape": "sphere", "name": "Impactor", "particles": None, "speed": None,    "material": MATERIALS["AL6061"], "mass": None, "volume": None, "cube": {"length": None,   "center": None},   "sphere": {"radius": 0.5 * 6.35e-3, "center": None}}
 
-# Parameter ===================================================================================================
-EMPIRICAL_PARAMS={
-    1: {"N": [1e+2, 1e+3, 1e+4, 1e+5, 1e+6], "delta": [1.0e-3, 1.0e-4, 1.0e-5, 1.0e-6, 1.0e-7 ], "sml":[None, None, None, None, None]},
-    2: {"N": [1e+4, 1e+5, 1e+6, 1e+7, 1e+8], "delta": [1.0e-3, 0.3e-3, 1.0e-4, 0.3e-4, 1.0e-5 ], "sml":[3.49e-03, 1.05e-03, 3.49e-04, 1.05e-04, 1.30e-05]},
-    3: {"N": [1e+4, 1e+5, 1e+6, 1e+7, 1e+8], "delta": [0.4e-2, 0.2e-2, 1.0e-3, 0.4e-3, 0.2e-3 ], "sml":[9.102e-3, 4.550e-3, 2.275e-3, 9.100e-4, 2.60e-04]}
-}
+# ==================================================================================================
+# Helper functions
+# ==================================================================================================
+def shape_def(obj):
+    """Return the shape definition from the SHAPES registry."""
+    try:
+        return SHAPES[obj["shape"]]
+    except KeyError:
+        raise ValueError(f"Unknown shape '{obj['shape']}'")
 
-SET = {
-    "v": {"name": "Velocities", "values":[0.0, -5.9e-2, -1e0, -5.3e0, -23.9, -7e3], "unit": f'{FIELD_META["v"]["unit"]}'},
-    "N": {"name": "Number of Particles", "values":None, "unit": r"$-$"}
-}
 
-# Funktionen ===================================================================================================
-def find_sml_for_target_neighbors(tree, positions, target_range=(150, 180), h_initial=0.001, dim=3, tol=1):
-    """
-    Find a smoothing length h such that the average number of neighbors is within the target range.
-    Uses binary search between h_min and h_max.
-
-    Returns:
-        best_h (float): smoothing length
-        avg_neighbors (float): average number of neighbors at that h
-    """
+def find_sml_for_target_neighbors(tree, positions, target_range=(150, 180), h_initial=0.001, dim=2, optimize=False):
     h_min = h_initial * 0.5
     h_max = h_initial * 3.0
     best_h = None
     best_avg_neighbors = 0
 
-    for _ in range(20):  # max 20 iterations
+    for _ in range(20):
         h_mid = 0.5 * (h_min + h_max)
-        neighbors_lens = np.array([len(n) - 1 for n in tree.query_ball_point(positions, r=h_mid)], dtype=TYPE["int"])
-        avg_neighbors = np.mean(neighbors_lens)
+        if optimize:
+            # Query nur k = target_max_neighbors + 1 Nachbarn
+            k = target_range[1] + 1
+            distances, _ = tree.query(positions, k=k)
+            avg_neighbors = np.mean(np.sum(distances[:, 1:] <= h_mid, axis=1))
+        else:
+            # Volle Radius-Abfrage
+            neighbors_lens = np.array([len(n) - 1 for n in tree.query_ball_point(positions, r=h_mid)])
+            avg_neighbors = np.mean(neighbors_lens)
 
         if target_range[0] <= avg_neighbors <= target_range[1]:
             best_h = h_mid
             best_avg_neighbors = avg_neighbors
-            break  # found suitable h
-
+            break
         if avg_neighbors < target_range[0]:
             h_min = h_mid
         else:
             h_max = h_mid
 
     return best_h, best_avg_neighbors
-def get_material_properties(material_key):
-    if material_key not in MATERIALS:
-        raise ValueError(f"Material '{material_key}' nicht definiert!")
-    return MATERIALS[material_key]
-def generate_cube_particles(edge_length, velocity, mass, material_id, density, center=None, delta=1e-3, dim=3):
+
+
+# ==================================================================================================
+# Object definitions
+# ==================================================================================================
+target = {
+    "id": 0,
+    "name": "Target",
+    "shape": "cube",
+    "material": MATERIALS["AL6061"],
+    "extent_min": 0.0,
+    "extent_max": 5.0e-2,
+
+    "center": np.zeros(3),
+    "speed": np.zeros(3),
+    "mass": None,
+    "volume": None,
+    "particles": None,
+}
+
+projectile = {
+    "id": 1,
+    "name": "Projectile",
+    "shape": "sphere",
+    "material": MATERIALS["AL6061"],
+    "extent_min": 0.0,
+    "extent_max": 0.5 * 6.35e-3,
+
+    "center": np.zeros(3),
+    "speed": np.zeros(3),
+    "mass": None,
+    "volume": None,
+    "particles": None,
+}
+
+
+# ==================================================================================================
+# Particle generators
+# ==================================================================================================
+def generate_cube_particles(extent_max, velocity, mass, material_id, density, center, delta, dim, optimize=False):
     """
-    Generate particles arranged in a cubic grid.
-
-    Args:
-        edge_length (float): Half edge length of the cube.
-        velocity (list): Velocity vector of particles [vx, vy, vz].
-        mass (float): Mass of each particle.
-        material_id (int): Material identifier.
-        density (float): Density of the material.
-        center (list): Center coordinates of the cube.
-        delta (float): Particle spacing.
-        dim (int): Dimension (1, 2 or 3).
-
-    Returns:
-        np.ndarray: Array of particles with columns [x, y, z, vx, vy, vz, m, materialId, rho].
+    Generate particles in a cube efficiently.
+    Uses numpy vectorization, low memory footprint, works for large N.
     """
-    if center is None:
-        center = [0] * dim
+    # Koordinatenbereiche pro Achse
+    x = np.arange(center[0] - extent_max, center[0] + extent_max + delta, delta)
+    y = np.arange(center[1] - extent_max, center[1] + extent_max + delta, delta) if dim >= 2 else np.array([center[1]])
+    z = np.arange(center[2] - extent_max, center[2] + extent_max + delta, delta) if dim == 3 else np.array([center[2]])
 
-    ranges = [np.arange(center[i] - edge_length, center[i] + edge_length + delta, delta) for i in range(dim)]
-    grids = np.meshgrid(*ranges, indexing='ij')
-    coords = np.stack([g.ravel() for g in grids], axis=0)
-
-    N = coords[0].size
-
-    vx = np.full(N, velocity[0], dtype=TYPE["float"])
-    vy = np.full(N, velocity[1], dtype=TYPE["float"]) if dim >= 2 else np.zeros(N)
-    vz = np.full(N, velocity[2], dtype=TYPE["float"]) if dim == 3 else np.zeros(N)
-
-    m = np.full(N, mass, dtype=TYPE["float"])
-    material_ids = np.full(N, material_id, dtype=TYPE["int"])
-    rho = np.full(N, density, dtype=TYPE["float"])
-    e= np.full(N, 0.0, dtype=TYPE["float"])
-
-    # Fill missing coords with zeros depending on dim
-    if dim == 1:
-        y = np.zeros(N)
-        z = np.zeros(N)
-        particles = np.vstack([coords[0], y, z, vx, vy, vz, m, material_ids, rho, e]).T
-    elif dim == 2:
-        z = np.zeros(N)
-        particles = np.vstack([coords[0], coords[1], z, vx, vy, vz, m, material_ids, rho, e]).T
-    else:
-        particles = np.vstack([coords[0], coords[1], coords[2], vx, vy, vz, m, material_ids, rho, e]).T
-
-    return particles
-def generate_sphere_particles(radius, velocity, mass, material_id, density, center=None, delta=1e-3, dim=3):
-    """
-    Generate particles arranged inside a sphere.
-
-    Args:
-        radius (float):
-        velocity (list): Velocity vector of particles [vx, vy, vz].
-        mass (float): Mass of each particle.
-        material_id (int): Material identifier.
-        density (float): Density of the material.
-        center (list): Center coordinates of the cube.
-        delta (float): Particle spacing.
-        dim (int): Dimension (1, 2 or 3).
-
-    Returns:
-        np.ndarray: Array of particles with columns [x, y, z, vx, vy, vz, m, materialId, rho].
-    """
-    if center is None:
-        center = [0] * dim
-
-    x = np.arange(center[0] - radius, center[0] + radius + delta, delta)
-    y = np.arange(center[1] - radius, center[1] + radius + delta, delta) if dim >= 2 else np.array([center[1]])
-    z = np.arange(center[2] - radius, center[2] + radius + delta, delta) if dim == 3 else np.array([center[2]])
-
+    # Meshgrid erzeugen für alle Dimensionen
     X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
-    X_flat, Y_flat, Z_flat = X.ravel(), Y.ravel(), Z.ravel()
+    pos = np.column_stack([X.ravel(), Y.ravel(), Z.ravel()])
 
-    distances = np.sqrt((X_flat - center[0]) ** 2 + (Y_flat - center[1]) ** 2 + (Z_flat - center[2]) ** 2)
-    mask = distances <= radius
+    # Anzahl Partikel
+    N = pos.shape[0]
 
-    X_valid = X_flat[mask]
-    Y_valid = Y_flat[mask]
-    Z_valid = Z_flat[mask]
+    # Particle Array vorbereiten
+    particles = np.zeros((N, 10))
+    particles[:, :3] = pos
+    particles[:, 3:3 + dim] = velocity[:dim]
+    particles[:, 6] = mass
+    particles[:, 7] = material_id
+    particles[:, 8] = density
 
-    N = len(X_valid)
-
-    vx = np.full(N, velocity[0], dtype=TYPE["float"])
-    vy = np.full(N, velocity[1], dtype=TYPE["float"]) if dim >= 2 else np.zeros(N)
-    vz = np.full(N, velocity[2], dtype=TYPE["float"]) if dim == 3 else np.zeros(N)
-
-    m = np.full(N, mass, dtype=TYPE["float"])
-    material_ids = np.full(N, material_id, dtype=TYPE["int"])
-    rho = np.full(N, density, dtype=TYPE["float"])
-    e= np.full(N, 0.0, dtype=TYPE["float"])
-
-    particles = np.vstack([X_valid, Y_valid, Z_valid, vx, vy, vz, m, material_ids, rho, e]).T
     return particles
 
-def main(dim, verbose, outDir, params, dry=False):
-    speed=params["speed"]
-    delta=params["delta"]
-    if delta is None:
-        logging.error("delta was not set. Exiting.")
-        exit(1)
 
-    logging.info("=== Simulation Parameters ===")
-    for entity in (TARGET, IMPACTOR):
-        # Wenn index außerhalb, nimm das erste Material
-        if entity["id"] >= len(params["material"]):
-            entity["material"] = get_material_properties(params["material"][0])
-        else:
-            entity["material"] = get_material_properties(params["material"][entity["id"]])
-        logging.info(f"Gewähltes Material für {entity['name']} ID {entity['id']}: {entity['material']['name']} mit Dichte {entity['material']['density']} kg/m³")
-        entity["mass"] = entity["material"]["density"] * delta ** dim
+def generate_sphere_particles(extent_max, velocity, mass, material_id, density, center, delta, dim, optimize=False):
+    """
+    Generate particles inside a sphere (or circle in 2D) efficiently.
+    Uses numpy vectorization, low memory footprint, works for large N.
+    """
+    # Koordinatenbereiche vorbereiten (nur benötigte Punkte)
+    x = np.arange(center[0] - extent_max, center[0] + extent_max + delta, delta)
+    y = np.arange(center[1] - extent_max, center[1] + extent_max + delta, delta) if dim >= 2 else np.array([center[1]])
+    z = np.arange(center[2] - extent_max, center[2] + extent_max + delta, delta) if dim == 3 else np.array([center[2]])
 
-    logging.info(f"Dimensions: {dim}D")
+    # Minimaler Meshgrid-Ansatz, nur für Maske, nicht stacken
+    X, Y, Z = np.meshgrid(x, y, z, indexing='ij')
+    r2 = (X - center[0]) ** 2 + (Y - center[1]) ** 2 + (Z - center[2]) ** 2
 
-    if dim == 2:
-        IMPACTOR["sphere"]["center"] = np.array([0, TARGET["cube"]["length"] + 4 * delta + IMPACTOR["sphere"]["radius"], 0])
-        IMPACTOR["speed"] = [0, speed, 0]
-    elif dim == 3:
-        IMPACTOR["sphere"]["center"] = np.array([0, 0, TARGET["cube"]["length"] + 4 * delta + IMPACTOR["sphere"]["radius"]])
-        IMPACTOR["speed"]  = [0, 0, speed]
-    else:
-        IMPACTOR["sphere"]["center"] = np.array([TARGET["cube"]["length"] + 4 * delta + IMPACTOR["sphere"]["radius"], 0, 0])
-        IMPACTOR["speed"]  = [speed, 0, 0]
+    mask = r2 <= extent_max ** 2
+    pos = np.column_stack([X[mask], Y[mask], Z[mask]])
+    N = pos.shape[0]
 
-    if 3 <= verbose :
-        logging.debug(f"Output directory: {outDir}")
-        logging.debug(f"Particle spacing (delta): {delta:.2e} m")
-        for entity in (TARGET, IMPACTOR):
-            logging.debug(f"{entity["name"]} parameters:")
-            logging.debug(f"Material density: {entity["material"]["density"]:.1f} kg/m³")
-            if entity["shape"] == "cube":
-                logging.debug(f"Cube half-length: {entity[entity["shape"]]['length']:.3e} m")
-            elif entity["shape"] == "sphere":
-                logging.debug(f"Sphere radius: {entity[entity["shape"]]['radius']:.3e} m")
-            logging.debug(f"Speed: {entity["speed"]} m/s")
+    # Particle Array
+    particles = np.zeros((N, 10))
+    particles[:, :3] = pos
+    particles[:, 3:3 + dim] = velocity[:dim]
+    particles[:, 6] = mass
+    particles[:, 7] = material_id
+    particles[:, 8] = density
 
-    for entity in (TARGET, IMPACTOR):
-        if entity["shape"] == "sphere":
-            entity["particles"] = generate_sphere_particles(entity["sphere"]["radius"], entity["speed"], entity["mass"], entity["id"], entity["material"]["density"], delta=delta, dim=dim, center=entity["sphere"]["center"])
-        elif entity["shape"] == "cube":
-            entity["particles"] = generate_cube_particles(entity["cube"]["length"],     entity["speed"], entity["mass"], entity["id"], entity["material"]["density"], delta=delta, dim=dim)
-        else:
-            logging.warning(f"shape ist nicht fertgeletg!")
+    return particles
 
-    if 3 <= verbose :
-        for entity in (TARGET, IMPACTOR):
-            logging.debug(f"Generated {len(entity['particles']):,} {entity["name"]} particles.")
-            if entity["shape"] == "cube":
-                entity["volume"]=(2 * entity["cube"]["length"]) ** dim
-            elif entity["shape"] == "sphere":
-                entity["volume"] = (4/3 * np.pi * entity["sphere"]["radius"]**3) if dim == 3 else (np.pi * entity["sphere"]["radius"]**2) if dim == 2 else (2 * entity["sphere"]["radius"])
-            logging.debug(f"Cube volume: {entity['volume']:.4e} m³")
-            logging.debug(f"Particles per m³ (cube): {len(entity['particles'])/entity['volume']:.2e}")
 
-    total_particles = np.concatenate((TARGET["particles"], IMPACTOR["particles"]))
-    logging.info(f"Generated Total {len(total_particles):.2e} particles.")
-    logging.info(f"  Δ={delta:.2e} → N={len(total_particles):.0f} ≈ {len(total_particles):.2e} ")
-    positions = total_particles[:, :dim]
+# ==================================================================================================
+# MAIN SIMULATION
+# ==================================================================================================
+def main(args):
+    start_time = datetime.now()
+    logging.extra(f"Started at {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
-    if not OPTIMIZE_COMPUTATION:
-        # Überprüfung auf doppelte Positionen
+    delta = args.delta
+    speed = args.velocity
+
+    # --- Setup materials and particle mass ----------------------------------------------
+    for obj in (target, projectile):
+        obj["material"] = MATERIALS[args.material[obj["id"] % len(args.material)]]
+        obj["mass"] = obj["material"]["density"] * delta ** args.dim
+        logging.extra(f"{obj['name'].capitalize()} | Material: {obj['material']['name']} | Mass per particle: {obj['mass']:.3e} kg")
+
+    # --- Set impactor velocity ------------------------------------------------------------
+    projectile["speed"][:] = 0.0
+    projectile["speed"][args.dim - 1] = speed
+    logging.extra(f"Projectile velocity set along dimension {args.dim}: {[f'{v:.2e}' for v in projectile['speed']]}")
+
+    # --- Place impactor at initial gap ---------------------------------------------------
+    offset = target["extent_max"] + GAP[args.dim] * delta + projectile["extent_max"]
+    shape_def(projectile)["center"](projectile)[args.dim - 1] = offset
+    logging.extra(f"Projectile initial center position: {[f'{v:.2e}' for v in projectile['center']]}")
+
+    # --- Generate particle distributions --------------------------------------------------
+    for obj in (target, projectile):
+        obj["particles"] = shape_def(obj)["generate"](obj, delta=delta, dim=args.dim, optimize=args.optimize)
+        obj["volume"] = shape_def(obj)["volume"](obj, args.dim, )
+        logging.info(f"{obj['name'].capitalize()} generated: {len(obj['particles'])} particles | Volume: {obj['volume']:.3e} m³")
+
+    total_particles = np.concatenate((target["particles"], projectile["particles"]))
+    positions = total_particles[:, :args.dim]
+    logging.info(f"Total particles in simulation: {len(total_particles)}")
+
+    # --- Optional sanity check for duplicate positions -----------------------------------
+    if not args.optimize:
         rounded_positions = np.round(positions, decimals=10)
         unique_positions = np.unique(rounded_positions, axis=0)
-
         if len(unique_positions) != len(rounded_positions):
             duplicates = len(rounded_positions) - len(unique_positions)
-            logging.warning(f"{duplicates} doppelte Partikelposition(en) erkannt!")
+            logging.warning(f"{duplicates} duplicate particle positions detected!")
         else:
-            logging.info("Keine doppelten Partikelpositionen gefunden.")
+            logging.info("No duplicate particle positions found.")
 
+    # --- Neighbor statistics and smoothing length ---------------------------------------
     tree = cKDTree(positions)
-    distances, indices = tree.query(positions, k=2)
-    nearest_distances = distances[:, 1]
-    average_distance = np.mean(nearest_distances)
-    logging.info(f"Average particle nearest-neighbor distance: {average_distance:.6e} m ~ delta ={delta:.6e} m")
+    distances, _ = tree.query(positions, k=2)
+    avg_dist = np.mean(distances[:, 1])
+    sml_estimate = ETA * avg_dist
+    logging.info(f"N={len(total_particles):.2e}, Δ={delta:.2e}, estimated h≈{sml_estimate:.2e}")
 
-    if average_distance < 0.5 * delta:
-        logging.warning("Average particle spacing is suspiciously low compared to delta!")
-
-    if 3 <= verbose :
-        logging.debug(f"Nearest-neighbor stats:")
-        logging.debug(f"  min: {np.min(nearest_distances):.3e} m")
-        logging.debug(f"  max: {np.max(nearest_distances):.3e} m")
-        logging.debug(f"  mean: {average_distance:.3e} m")
-        logging.debug(f"  std: {np.std(nearest_distances):.3e} m")
-
-    # === SPH Smoothing Length Vorschlag ===
-    eta = ETA  # Sicherheitsfaktor eta ∈ [1.2, 2.0]
-    smoothing_length = eta * average_distance
-    logging.info(f"Empfohlene Smoothing Length h ≈ {smoothing_length:.6e} m (η = {eta}, average_distance = {average_distance:.6e})")
-
+    smoothing_length = sml_estimate
     if smoothing_length < delta:
-        logging.warning("Vorgeschlagene smoothing length ist kleiner als delta! SPH-Ergebnisse können ungenau sein.")
+        logging.warning("Suggested smoothing length is smaller than delta!")
     elif smoothing_length < 1.1 * delta:
-        logging.warning("Smoothing length ist nur minimal größer als delta – eventuell zu wenig Nachbarn.")
+        logging.warning("Smoothing length is only slightly larger than delta.")
 
-    if not OPTIMIZE_COMPUTATION:
-        # === Automatische SML-Suche für Nachbarn ===
+    sml_optimized, avg_neighbors_optimized = None, None
+    if not args.optimize:
         target_min_neighbors, target_max_neighbors = NEIGHBORS
-        best_h, best_avg_n = find_sml_for_target_neighbors(
-            tree,
-            positions,
-            target_range=(target_min_neighbors, target_max_neighbors),
-            h_initial=smoothing_length,
-            dim=dim
+        sml_optimized, avg_neighbors_optimized = find_sml_for_target_neighbors(
+            tree, positions, target_range=(target_min_neighbors, target_max_neighbors),
+            h_initial=smoothing_length, dim=args.dim, optimize=args.optimize
         )
-
-        if best_h is not None:
-            logging.info(f"Gefundene SML für {target_min_neighbors}–{target_max_neighbors} Nachbarn:")
-            logging.info(f"  h ≈ {best_h:.6e} m  → durchschnittlich {best_avg_n:.1f} Nachbarn")
-            smoothing_length=best_h
+        if sml_optimized is not None:
+            logging.info(f"SML optimized: h ≈ {sml_optimized:.6e} m, avg neighbors ≈ {avg_neighbors_optimized:.1f}")
+            smoothing_length = sml_optimized
         else:
-            logging.warning("Keine geeignete SML im getesteten Bereich gefunden.")
+            logging.warning("No suitable smoothing length found in tested range.")
 
-        # === Berechne max. Anzahl an Nachbarn innerhalb der SML ===
-        logging.info("Berechne Anzahl von Nachbarn pro Partikel innerhalb der smoothing length h...")
-
-        neighbors_per_particle = tree.query_ball_point(positions, r=smoothing_length)
-        num_neighbors = np.array([len(neighs) - 1 for neighs in neighbors_per_particle])  # -1: exclude self
-
-        logging.info(f"Nachbarn innerhalb SML (h = {smoothing_length:.2e} m):")
-        logging.info(f"  max:  {np.max(num_neighbors)}")
-        logging.info(f"  min:  {np.min(num_neighbors)}")
-        logging.info(f"  mean: {np.mean(num_neighbors):.2f}")
-        logging.info(f"  std:  {np.std(num_neighbors):.2f}")
-
-    # === Visualisierung auslagern ===
-    date_str = datetime.now().strftime("%Y%m%d")
-    name = "alloy"
-    basename = (
-        f"{date_str}_{name}"
-        f"_N{len(total_particles):.1e}"
-        f"_SML{smoothing_length:.2e}"
-        f"_D{dim}"
-        f"_V{np.linalg.norm(IMPACTOR['speed']):.2e}"
-    )
-    if not dry:
-        logging.info(f"Saving HDF5 as {basename}{EXTENSION['data']}")
-        # Save data to HDF5
-        with h5py.File(os.path.join(outDir,f"{basename}.h5"), "w") as h5f:
-            h5f.create_dataset("x", data=total_particles[:, :dim].astype(TYPE["float"]))  # only spatial coordinates
-            h5f.create_dataset("v", data=total_particles[:, 3:3+dim].astype(TYPE["float"]))  # velocity components
-            h5f.create_dataset("m", data=total_particles[:, 6].astype(TYPE["float"]))  # mass
-            h5f.create_dataset("materialId", data=total_particles[:, 7].astype(TYPE["int"]))  # material id
-            h5f.create_dataset("rho", data=total_particles[:, 8].astype(TYPE["float"]))  # density
-            h5f.create_dataset("u", data=total_particles[:, 9].astype(TYPE["float"]))  # specific energy
-
-        # Automatically adjust AXES_CONFIG based on global x min/max
-        logging.info("Computing global extrema for 'x' to adjust axis limits...")
-        x_mins = [float(np.min(positions[:, i])) for i in range(dim)]
-        x_maxs = [float(np.max(positions[:, i])) for i in range(dim)]
-        for i, label in zip(range(dim), AXES_CONFIG.keys()):
-            if i < len(x_mins) and i < len(x_maxs):
-                logging.debug(f"'{label}' mins: {[f'{v:.2f}' for v in x_mins]}, maxs: {[f'{v:.2f}' for v in x_maxs]}")
-                AXES_CONFIG[label]["limits"] = (x_mins[i] - FRAME_PADDING, x_maxs[i] + FRAME_PADDING)
-                limits = AXES_CONFIG[label]['limits']
-                logging.info(f"Updated axis '{label}' limits: ({limits[0]:.2f}, {limits[1]:.2f})")
-            else:
-                logging.warning(f"Skipping axis '{label}' due to insufficient extrema data.")
-
-        N = total_particles.shape[0]
-        alpha, marker_size, skip = plotScatter.dynamic_render_config(N)
-
-        # Optional: Logging
-        logging.info(f"Using dynamic rendering config for N={N}: alpha={alpha}, marker_size={marker_size}, skip={skip}")
-
-        # Plot in 3D or 2D based on argument
-        if dim == 3:
-            coords = (total_particles[:, 0][::skip], total_particles[:, 1][::skip], total_particles[:, 2][::skip])
-            funk = plotScatter.plot_3D_scatter
-            planes=PLANES
-        elif dim == 2:
-            coords = (total_particles[:, 0][::skip], total_particles[:, 1][::skip], np.zeros_like(total_particles[:, 1][::skip]))
-            funk=plotScatter.plot_2D_scatter
-            planes=[PLANES[0]]
-        else:
-            coords = (total_particles[:, 0][::skip],  np.zeros_like(total_particles[:, 0][::skip]), np.zeros_like(total_particles[:, 0][::skip]))
-            funk=plotScatter.plot_2D_scatter
-
-        velocity_magnitude = np.linalg.norm(total_particles[:, 3:3+dim], axis=1)
-
-        logging.info(f"Saving Plots as {basename}{EXTENSION['plot']}")
-        funk(
-            coords,
-            datas=[total_particles[:, 6][::skip], total_particles[:, 8][::skip], velocity_magnitude[::skip], total_particles[:, 9][::skip]],
-            labels=[
-                f"Mass (m) [{FIELD_META['m']['unit']}]",
-                f"Velocity (|v|) [{FIELD_META['v']['unit']}]",
-                f"Density (ρ) [{FIELD_META['rho']['unit']}]",
-                f"specific Energy (e) [{FIELD_META['e']['unit']}]"
+    if args.pipeline:
+        result = {
+            "header": [
+                "delta_particles",
+                "N_tot",
+                "N_target",
+                "N_projectile",
+                "SML_estimate",
+                "SML_optimize",
+                "avg_distance_particles",
+                "avg_neighbors_optimized",
+                "delta_gap"
             ],
-            cmaps=[FIELD_META['m']['cmap'], FIELD_META['v']['cmap'], FIELD_META['rho']['cmap'], FIELD_META['e']['cmap']],
-            filename=os.path.join(outDir, f"{basename}_hydro"),
-            dpi=300,
-            point_size=marker_size,
-            axis_config=AXES_CONFIG,
-            alpha=alpha
-        )
+            "data": {
+                "delta_particles": "{:.6e}".format(float(delta)),
+                "N_tot": "{:.6e}".format(int(total_particles.shape[0])),
+                "N_target": "{:.6e}".format(int(target["particles"].shape[0])),
+                "N_projectile": "{:.6e}".format(int(projectile["particles"].shape[0])),
+                "SML_estimate": "{:.6e}".format(float(sml_estimate)),
+                "SML_optimize": "{:.6e}".format(float(sml_optimized if sml_optimized is not None else np.nan)),
+                "avg_distance_particles": "{:.6e}".format(float(avg_dist)),
+                "avg_neighbors_optimized": "{:.6e}".format(float(avg_neighbors_optimized if avg_neighbors_optimized is not None else np.nan)),
+                "delta_gap": "{:.6e}".format(float(GAP[args.dim] * delta))
+            }
+        }
 
-        if dim == 3:
-            # --- Slices in 2D (für 3D-Daten) ---
-            plotScatter.plot_2D_slice(
-                planes,
-                (total_particles[:, 0], total_particles[:, 1], total_particles[:, 2]),
-                data=[total_particles[:, 6], total_particles[:, 8], velocity_magnitude, total_particles[:, 9]],
-                labels=[
-                    f"Mass (m) [{FIELD_META['m']['unit']}]",
-                    f"Velocity (|v|) [{FIELD_META['v']['unit']}]",
-                    f"Density (ρ) [{FIELD_META['rho']['unit']}]",
-                    f"specific Energy (e) [{FIELD_META['e']['unit']}]"
-                ],
-                cmaps=[FIELD_META['m']['cmap'], FIELD_META['v']['cmap'], FIELD_META['rho']['cmap'], FIELD_META['e']['cmap']],
-                filename=os.path.join(outDir, f"{basename}_hydro_slice"),
-                dpi=300,
-                point_size=marker_size,
-                axis_config=AXES_CONFIG,
-                alpha=alpha
-            )
+        # print("PIPELINE_JSON_START")
+        print(json.dumps(result))
+        # print("PIPELINE_JSON_END")
 
-        funk(
-            coords,
-            datas=[total_particles[:, 7][::skip]],
-            labels=["Material ID"],
-            cmaps=["tab10"],
-            filename=os.path.join(outDir, f"{basename}_id"),
-            dpi=300,
-            point_size=marker_size,
-            axis_config=AXES_CONFIG,
-            alpha=alpha,
-        )
+    # ======================================================================
+    # Visualization setup
+    # ======================================================================
+    date_str = datetime.now().strftime("%Y%m%d")
+    basename = f"{date_str}_alloy_D{args.dim}_{projectile['shape'][0]}{target['shape'][0]}_N{len(total_particles):.1e}_DELTA{delta:.1e}_SML{smoothing_length:.2e}_V{speed:.2e}"
 
-    if 3 < verbose:
-        with h5py.File(os.path.join(outDir, f"{basename}.h5"), "r") as f:
-            logging.debug("HDF5 dataset contents:")
+    if args.output == "./":
+        args.output = os.path.join(os.getcwd(), f"output/{date_str}")
+    # N = len(total_particles)
+    # exponent = int(np.floor(np.log10(N)))  # Ganze Zahl des Exponenten
+    # mantisse = N / 10 ** exponent  # Mantisse zwischen 1 und 10
+    # args.output = os.path.join(args.output, f"N{exponent:02d}_{mantisse:.2f}")
+    if not args.dry:
+        os.makedirs(args.output, exist_ok=True)
+    logging.info(f"Output directory: {args.output}")
+
+    # Compute axis limits
+    x_mins = [float(np.min(positions[:, i])) for i in range(args.dim)]
+    x_maxs = [float(np.max(positions[:, i])) for i in range(args.dim)]
+
+    for i, axis in zip(range(args.dim), AXES_CONFIG.keys()):
+        if i < len(x_mins) and i < len(x_maxs):
+            logging.info(f"'{axis}' {x_mins} {x_maxs}")
+
+            AXES_CONFIG[axis]["limits"] = ((x_mins[i] - FRAME_PADDING) / si_prefixes[args.scale["x"]]["factor"], (x_maxs[i] + FRAME_PADDING) / si_prefixes[args.scale["x"]]["factor"])
+            logging.info(f"Updated axis '{axis}' limits: {AXES_CONFIG[axis]['limits']}")
+
+            AXES_CONFIG[axis]['labels'] = utility.format_math_text(f'${axis}$ [${si_prefixes[args.scale["x"]]["abbr"]}{FIELD_META["x"]["unit"].strip("$")}$]')
+            logging.info(f"Updated axis '{axis}' labels: {AXES_CONFIG[axis]['labels']}")
+
+        else:
+            logging.warning(f"Skipping axis '{axis}' due to insufficient extrema data.")
+
+    # Compute derived quantities for plotting
+    velocity_magnitude = np.linalg.norm(total_particles[:, 3:3 + args.dim], axis=1)
+    position_magnitude = np.linalg.norm(total_particles[:, :args.dim], axis=1)
+    DATA_SOURCES = {
+        "x": position_magnitude,
+        "v": velocity_magnitude,
+        "m": total_particles[:, 6],
+        "matId": total_particles[:, 7],
+        "rho": total_particles[:, 8],
+        "e": total_particles[:, 9]
+    }
+
+    marker_atts = utility.dynamic_render_config(positions.shape[0], args.dim)
+    logging.extra(f"Dynamic rendering configuration: { {k: (f'{v:.2e}' if isinstance(v, float) else v) for k, v in marker_atts.items()} }")
+    skip = marker_atts["skip"]
+
+    # --- Plot particles -------------------------------------------------------
+    if args.dim == 3:
+        coords = (positions[:, 0][::skip] / si_prefixes[args.scale["x"]]["factor"], positions[:, 1][::skip] / si_prefixes[args.scale["x"]]["factor"],
+                  positions[:, 2][::skip] / si_prefixes[args.scale["x"]]["factor"])
+        plot_func = plotScatter.plot_3D_scatter
+        planes = PLANES
+    else:
+        coords = (positions[:, 0][::skip] / si_prefixes[args.scale["x"]]["factor"], positions[:, 1][::skip] / si_prefixes[args.scale["x"]]["factor"],
+                  np.zeros_like(positions[:, 0][::skip] / si_prefixes[args.scale["x"]]["factor"]))
+        plot_func = plotScatter.plot_2D_scatter
+        planes = [PLANES[0]]
+
+    datas = []
+    for k in args.keys:
+
+        data = DATA_SOURCES[k]
+        if args.scale.get(k):
+            data = data / si_prefixes[args.scale[k]]["factor"]
+
+        datas.append(data[::skip])
+
+    vector_fields = {"v", "a", "x"}
+    labels = [
+        utility.format_math_text(rf"{FIELD_META[k]['name']} "
+                                 rf"({f'$|{FIELD_META[k]['symbol'].strip('$')}|$' if k in vector_fields else FIELD_META[k]['symbol']} "
+                                 rf"[${si_prefixes[args.scale[k]]['abbr'] if args.scale.get(k) else ''}{FIELD_META[k]['unit'].strip('$')}$])")
+        for k in args.keys
+    ]
+    cmaps = [FIELD_META[k]['cmap'] if k != 'matId' else "tab10" for k in args.keys]
+
+    # Base title
+    title = utility.format_math_text(
+        rf"Initial Conditions ${args.dim}D$, Time: $t=\num{{{0:.3f}}}$ ${si_prefixes[args.scale['t']]['abbr']}{FIELD_META['t']['unit'].strip('$')}$ "  # Simulation Dimension
+        "\n"
+        rf"Particles: $N_{{par ,tot}}=\num{{{positions.shape[0]:.2e}}}$, $\Delta_{{par}}=\num{{{delta:.1e}}}$ {FIELD_META['x']['unit']} "
+        "\n"
+        rf"Velocity: $|{FIELD_META['v']['symbol'].strip('$')}_{{\mathrm{{proj}}}}|=\num{{{speed:.2e}}}$ {FIELD_META['v']['unit']}"
+    )
+
+    # Add material info if 'matId' is not in keys
+    note = None
+    material_atts = None
+    if "matId" not in args.keys:
+        note = utility.format_math_text(f"\n {target['name']}: {target['material']['alias']}, {projectile['name']}: {projectile['material']['alias']}")
+    else:
+        material_atts = {int(obj["id"]): utility.format_math_text(f"{obj['material']['alias']} ({obj['name']})") for obj in (target, projectile) if "id" in obj and "material" in obj}
+
+    if not args.dry:
+        plot_func(coords, datas=datas, labels=labels, keys=args.keys, cmaps=cmaps,
+                  title=title, note=note,
+                  filename=os.path.join(args.output, f"{basename}_{'_'.join(args.keys)}"),
+                  dpi=args.dpi, marker_atts=marker_atts, material_atts=material_atts, axis_config=AXES_CONFIG, extension=args.extension
+                  )
+    if args.slice and not args.dry and not args.optimize:
+        plotScatter.plot_2D_slice(planes, coords, data=datas, labels=labels, keys=args.keys, cmaps=cmaps,
+                                  title=title, note=note,
+                                  filename=os.path.join(args.output, f"{basename}_{'_'.join(args.keys)}"),
+                                  dpi=args.dpi, marker_atts=marker_atts, material_atts=material_atts, axis_config=AXES_CONFIG, extension=args.extension
+                                  )
+
+    # --- Save HDF5 dataset ---------------------------------------------------
+    h5_file_path = os.path.join(args.output, f"{basename}.h5")
+    if not args.dry:
+        logging.info(f"Saving HDF5 file to {h5_file_path}")
+        with h5py.File(h5_file_path, "w") as h5f:
+            h5f.create_dataset("x", data=total_particles[:, :args.dim].astype(DTYPE["float"]))
+            h5f.create_dataset("v", data=total_particles[:, 3:3 + args.dim].astype(DTYPE["float"]))
+            h5f.create_dataset("m", data=total_particles[:, 6].astype(DTYPE["float"]))
+            h5f.create_dataset("materialId", data=total_particles[:, 7].astype(DTYPE["int"]))
+            h5f.create_dataset("rho", data=total_particles[:, 8].astype(DTYPE["float"]))
+            h5f.create_dataset("u", data=total_particles[:, 9].astype(DTYPE["float"]))
+
+        # --- Log HDF5 summary ---------------------------------------------------
+        with h5py.File(h5_file_path, "r") as f:
+            logging.extra("HDF5 dataset contents:")
             for key in f.keys():
                 dataset = f[key]
-                shape = dataset.shape
-                dtype = dataset.dtype
-                min_val = np.min(dataset)
-                max_val = np.max(dataset)
+                logging.extra(f"{key}: shape={dataset.shape}, dtype={dataset.dtype}, min={np.min(dataset):.3e}, max={np.max(dataset):.3e}")
 
-                logging.debug(f"  {key}:")
-                logging.debug(f"    shape = {shape}, dtype = {dtype}")
-                logging.debug(f"    min = {min_val:.3e}, max = {max_val:.3e}")
-
-                sample = dataset[:3]  # First 3 entries
-
-                if sample.ndim == 1:
-
-                    logging.debug(f"    sample: {sample} ...")
-                else:
-                    logging.debug(f"    sample:")
-                    for i, row in enumerate(sample):
-                        row_str = ", ".join([f"{val:.6f}" for val in row])
-                        logging.debug(f"      [{i}] [{row_str}]")
-
+    # --- Memory usage -------------------------------------------------------
     usage = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    if sys.platform == "darwin":  # macOS
-        max_rss_gb = usage / (1024 ** 3)
-    else:  # Linux & andere
-        max_rss_gb = usage / (1024 ** 2)
+    max_rss_gb = usage / (1024 ** 2 if sys.platform != "darwin" else 1024 ** 3)
+    logging.info(f"Max memory usage: {max_rss_gb:.2e} GB")
 
-    logging.info(f"Max memory usage: {max_rss_gb:.2f} GB")
+    end_time = datetime.now()
+    logging.extra(f"Finished at {end_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    logging.info(f"Total runtime: {end_time - start_time}")
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Particle simulation for cube and impactor")
-    parser.add_argument("-d", "--dimensions", type=int, choices=[1, 2, 3], default=3,help="Number of spatial dimensions (1, 2 or 3)")
-    parser.add_argument("-v", "--verbose", type=int, choices=[1, 2, 3], default=3,help="Enable verbose output")
-    parser.add_argument("--output", "-o", type=str, default="./", help="Output directory")
-    parser.add_argument("--delta", type=float, default=1e-3, help="Particle spacing (default: 1e-3m)")
-    parser.add_argument("--dry", action="store_true", help="Run the script without saving any files.")
-    parser.add_argument("--set", type=str, choices=list(SET.keys()))
-    parser.add_argument("--constant", type=int, default=0, help="Index of constant parameter value (default: 0)")
-    parser.add_argument("--material",nargs="+",type=str,default=["AL6061"],choices=MATERIALS.keys(),help="Materials used in simulation. Default: AL6061")
+
+# ==================================================================================================
+# Command line interface
+# ==================================================================================================
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Initialize particle system for target-impactor simulation.")
+    parser.add_argument("-d", "--dim", type=int, default=3, choices=[1, 2, 3], help="Simulation dimension")
+    parser.add_argument("--delta", type=float, default=1.0e-3, help="Particle spacing")
+    parser.add_argument("--velocity", type=float, default=0.0, help="Impactor velocity along impact direction")
+    parser.add_argument("--material", nargs="+", default=["AL6061"], choices=list(constants.MATERIALS.keys()), help=f"Available materials: {', '.join(list(constants.MATERIALS.keys()))}")
+    parser.add_argument("--keys", "-k", nargs="+", default=["x", "v", "m", "matId", "rho", "e"], help="Keys for visualization")
+    parser.add_argument("--slice", action="store_true", help="Generate 2D slice plots")
+    parser.add_argument("--output", "-o", default="./", help="Output folder")
+    parser.add_argument("-v", "--verbose", type=int, default=3, help="Logging level")
+    parser.add_argument("--dry", action="store_true", help="Run without saving files")
+    parser.add_argument("--optimize", action="store_true", help="Skip runtime checks for faster execution")
+    parser.add_argument("--pipeline", action="store_true", help="Output compact JSON for pipeline usage")
+    parser.add_argument("--scale", nargs="+", default=[], metavar="axis=factor", help="Scaling for axes, e.g. --scale x=centi t=micro")
+    parser.add_argument("--dpi", type=int, default=300, help="Set DPI for all output plots (default: 300).")
+    parser.add_argument("--extension", nargs="+", default=["png"], choices=["png", "pdf", "svg", "jpg"], help="Output file formats (default: png). Example: -e png pdf svg")
 
     args = parser.parse_args()
 
-    # Set logging level based on verbosity flag
-    if args.verbose >= 3:
-        log_level = logging.DEBUG
-    elif args.verbose == 2:
-        log_level = logging.INFO
-    else:
-        log_level = logging.WARNING
+    # verbosity mapping
+    LEVEL_MAP = {
+        0: logging.ERROR,
+        1: logging.WARNING,
+        2: logging.INFO,
+        3: EXTRA_LEVEL_NUM,
+        4: logging.DEBUG,
+    }
 
-    logging.basicConfig(
-        level=log_level,
-        format='[%(levelname)s] %(message)s',
-        handlers=[logging.StreamHandler(sys.stdout)]
-    )
+    log_level = LEVEL_MAP.get(args.verbose, logging.INFO)
+    utility.setup_logging(time=False, level=log_level)
+    if args.pipeline:
+        logging.disable(logging.CRITICAL)  # disables all logging
 
-    logging.info("=== Parser Parameters ===")
+    for item in args.scale:
+        if "=" not in item:
+            raise ValueError(f"Invalid scale format '{item}', expected axis=factor")
 
-    if not os.path.exists(args.output):
-        logging.error(f"Not existing output directory: {args.output}")
-        sys.exit(1)
+        axis, factor = item.split("=", 1)
 
-    if args.dry:
-        logging.info("[Dry-run] Skipping file writes.")
+        if axis not in SCALE:
+            raise ValueError(f"Unknown scale axis '{axis}', allowed: {list(SCALE.keys())}")
 
-    SET["N"]["values"] = EMPIRICAL_PARAMS[args.dimensions]["delta"]
-    if args.set:
-        set={"speed": SET['v']["values"], "delta": SET["N"]["values"], "N":EMPIRICAL_PARAMS[args.dimensions]["N"]}
-        for i in range(len(SET[args.set]["values"])):
-            logging.info("=== Set Parameters ===")
-            if args.set.lower() == "v":
-                dirName=f"N{set['N'][args.constant]:.0e}_v{set['speed'][i]:.2e}"
-                params={"speed": set["speed"][i], "delta":set["delta"][args.constant], "material":args.material}
-            elif args.set.lower() == "n":
-                dirName=f"N{set['N'][i]:.0e}_v{set['speed'][args.constant]:.2e}"
-                params={"speed": set["speed"][args.constant], "delta":set["delta"][i], "material":args.material}
-            else:
-                logging.warning(f"Unbekannter Set-Modus: {args.set}")
-                continue
+        if factor not in si_prefixes:
+            raise ValueError(
+                f"Unknown scale factor '{factor}', allowed: {list(si_prefixes.keys())}"
+            )
 
-            out_dir = os.path.join(args.output, dirName)
-            logging.info(f"{out_dir} {SET['N']['values']}")
-            logging.debug(f"{os.path.basename(out_dir)}")
-            os.makedirs(out_dir, exist_ok=True)
-            main(args.dimensions, args.verbose, out_dir, params, args.dry)
-    else:
-        os.makedirs(args.output, exist_ok=True)
-        params={"speed": SET["v"]["values"][args.constant], "delta":args.delta, "material":args.material}
-        main(args.dimensions, args.verbose, args.output, params, args.dry)
+        SCALE[axis] = factor
+    args.scale = SCALE
+
+    if not args.keys: args.keys = ["x"]
+    main(args)

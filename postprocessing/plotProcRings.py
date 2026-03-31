@@ -59,7 +59,7 @@ for h5file in sorted(glob.glob(os.path.join(args.data, "*.h5")), key=os.path.bas
     #ax.set_title('Timestep: {}'.format(time[i][0]))
     ax.set_title("MPI-Processes")
 
-
+    plt.savefig("{0:}/Process{1:06d}.pdf".format(args.output, i))
     plt.savefig("{0:}/Process{1:06d}.png".format(args.output, i))
     plt.close()
     i = i+1

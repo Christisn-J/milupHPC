@@ -3,14 +3,29 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import h5py
+import argparse
+import json
+import os
+
 
 """
 this program creates two 2-D rings (z = 0) around the origin which are then shifted to their final positions
 used for colliding rings testcase, see Gray, Monaghan, Swift SPH elastic dynamics, journal of Computer methods
 in applied mechanics and engineering (2001)
 """
+
+parser = argparse.ArgumentParser(add_help=False)
+parser.add_argument("-d", "--dim", type=int, default=2, choices=[1, 2, 3], help="Simulation dimension")
+parser.add_argument("--delta", type=float, default=1.0e-1, help="Particle spacing")
+parser.add_argument("--velocity", type=float, default=0.059, help="Impactor velocity along impact direction")
+parser.add_argument("--output", "-o", default="./", help="Output folder")
+parser.add_argument("-v", "--verbose", type=int, default=3, help="Logging level")
+parser.add_argument("--pipeline", action="store_true")
+parser.add_argument("--dry", action="store_true", help="Run without saving files")
+args, _ = parser.parse_known_args()
+
 # Dim of Rings
-dim = 2
+dim = args.dim
 
 # Fill up with zeros to 3D
 fillUp = False
@@ -20,7 +35,8 @@ r_inner = 3.0
 r_outer = 4.0
 
 # particle spacing
-delta_p = 0.1
+delta_p = args.delta
+# delta_p = 0.1
 # 0.1   --> 2 * 2.196   = 4.392   particles
 # 0.07  --> 2 * 4.488   = 8.976   particles
 # 0.05  --> 2 * 8.804   = 17.608  particles
@@ -123,7 +139,8 @@ shift = 5
 # shift = 4.2  # for delta p <= 0.002
 
 # projected speed
-v_p = 0.059 # should be for testcase with AS
+v_p = args.velocity
+# v_p = 0.059 # should be for testcase with AS
 # v_p = 0.03 # testcase without AS
 
 density = 1
@@ -178,6 +195,13 @@ else:
 m = np.ones(2*N)*mass # 2N because of two rings
 rho = np.ones(2*N)*density
 materialId = np.zeros(2*N, dtype=np.int8)
+
+# Ring 1 -> materialId = 1
+materialId[0:N] = 0
+
+# Ring 2 -> materialId = 2
+materialId[N:2*N] = 1
+
 #Sxx = np.zeros(2*N)
 #Sxy = np.zeros(2*N)
 
@@ -213,27 +237,55 @@ for i in range(N_square):
 # put two rings in one array
 r_final = np.concatenate((r_ring, r_ring2))
 v_final = np.concatenate((v, v2))
+if not args.dry:
 
-if fillUp:
-    #h5f = h5py.File("rings_N{}-3D.h5".format(2*N), "w")
-    #print("Saving to rings_N{}-3D.h5...".format(2*N))
-    h5f = h5py.File("rings_deltap{}-3D.h5".format(delta_p), "w")
-    print("Saving to rings_deltap{}-3D.h5...".format(delta_p))
+    # Dateiname mit delta und Dim
+    if fillUp:
+        filename = os.path.join(args.output, f"rings_deltap{delta_p}-3D.h5")
+    else:
+        filename = os.path.join(args.output, f"rings_deltap{delta_p}-2D.h5")
+    print(f"Saving to {filename}")
+
+    # write to hdf5 data set
+    h5f = h5py.File(filename, "w")
+    h5f.create_dataset("x", data=r_final)
+    h5f.create_dataset("v", data=v_final)
+    h5f.create_dataset("m", data=m)
+    h5f.create_dataset("materialId", data=materialId)
+    h5f.create_dataset("rho", data=rho)
+    #h5f.create_dataset("Sxx", data=Sxx)
+    #h5f.create_dataset("Sxy", data=Sxy)
+
+    h5f.close()
+
+if args.pipeline:
+    if args.pipeline:
+        result = {
+            "header": [
+                "delta_particles",
+                "N_tot",
+                "N_ring",
+                "SML_estimate",
+                "SML_optimize",
+                "avg_distance_particles",
+                "avg_neighbors_optimized",
+                "delta_gap"
+            ],
+            "data": {
+                "delta_particles": f"{delta_p:.6e}",
+                "N_tot": f"{2*N:.6e}",
+                "N_ring": f"{N:.6e}",
+                "SML_estimate": f"{np.nan:.6e}",
+                "SML_optimize": f"{np.nan:.6e}",
+                "avg_distance_particles": f"{np.nan:.6e}",
+                "avg_neighbors_optimized": f"{np.nan:.6e}",
+                "delta_gap": f"{2*shift:.6e}"
+            }
+        }
+
+    # print("PIPELINE_JSON_START")
+    print(json.dumps(result))
+    # print("PIPELINE_JSON_END")
 else:
-    #h5f = h5py.File("rings_N{}-2D.h5".format(2*N), "w")
-    #print("Saving to rings_N{}-2D.h5...".format(2*N))
-    h5f = h5py.File("rings_deltap{}-2D.h5".format(delta_p), "w")
-    print("Saving to rings_deltap{}-2D.h5...".format(delta_p))
-
-# write to hdf5 data set
-h5f.create_dataset("x", data=r_final)
-h5f.create_dataset("v", data=v_final)
-h5f.create_dataset("m", data=m)
-h5f.create_dataset("materialId", data=materialId)
-h5f.create_dataset("rho", data=rho)
-#h5f.create_dataset("Sxx", data=Sxx)
-#h5f.create_dataset("Sxy", data=Sxy)
-
-h5f.close()
-print("Number of particles: ", 2*N)
-print("Finished")
+    print("Number of particles:", 2*N)
+    print("Finished")

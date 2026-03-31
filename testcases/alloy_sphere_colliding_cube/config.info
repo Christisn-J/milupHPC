@@ -29,8 +29,7 @@ timeStep 1e-6
 ; max time step allowed
 maxTimeStep 1e-1
 ; end time for simulation
-; 1.0169
-timeEnd 0.50845
+timeEnd 8.57142e-6
 
 ; SIMULATION RELATED
 ; ------------------------------------------------------
